@@ -39,7 +39,7 @@ public class ScrapingApplication {
                 .numberOfArgs(2)
                 .argName("in-file output folder")
                 .required()
-                .desc("required two filenames")
+                .desc("required two val")
                 .build());
         
         List<String> links = new ArrayList<>();
@@ -67,7 +67,7 @@ public class ScrapingApplication {
             
         } catch (ParseException ex) {
             HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("web-template", options);
+            formatter.printHelp("scraping application", options);
         }
         
         for (String link : links) {
