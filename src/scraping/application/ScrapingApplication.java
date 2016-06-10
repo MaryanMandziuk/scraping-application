@@ -10,8 +10,10 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+import static java.util.Locale.filter;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -21,6 +23,8 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 /**
  *
@@ -30,8 +34,14 @@ public class ScrapingApplication {
 
     /**
      * @param args the command line arguments
+     * @throws java.io.FileNotFoundException
+     * @throws java.io.IOException
+     * @throws org.apache.commons.cli.ParseException
      */
-    public static void main(String[] args) throws FileNotFoundException, IOException {
+    public static void main(String[] args) throws FileNotFoundException, IOException, ParseException {
+        
+        final String TMPL_EXT = ".tmpl";
+        
         CommandLineParser parser = new DefaultParser();
         Options options = new Options();
         
@@ -39,7 +49,7 @@ public class ScrapingApplication {
                 .numberOfArgs(2)
                 .argName("in-file output folder")
                 .required()
-                .desc("required two val")
+                .desc("required two value")
                 .build());
         
         List<String> links = new ArrayList<>();
@@ -68,13 +78,34 @@ public class ScrapingApplication {
         } catch (ParseException ex) {
             HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("scraping application", options);
+            throw ex;
         }
         
+        
+        int i = 0;
         for (String link : links) {
+            i++;
             try {
                 Document doc = Jsoup.connect(link).timeout(1000).get();
-                System.out.println("Link=" + link);                
-                System.out.println(doc.html());
+                String title = doc.getElementsByTag("title").text().replaceAll(" - Лео творит!", "");
+                Element content = doc.getElementsByClass("entry-content").get(0);
+                
+                
+                content.getElementsByTag("div").remove();
+ 
+                String articleName = "articleTitle" + Integer.toString(i) + TMPL_EXT;
+                        
+                try (PrintWriter out = new PrintWriter(articleName)) {
+                    out.println(title);
+                }
+                
+                String contentName = "article" + Integer.toString(i) + TMPL_EXT;
+                        
+               
+                try (PrintWriter out = new PrintWriter(contentName)) {
+                    out.println(title);
+                }
+                
             } catch (IOException ex) {
                 System.err.println("Error: " + ex);
                 
