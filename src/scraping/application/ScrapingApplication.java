@@ -83,6 +83,7 @@ public class ScrapingApplication {
         
         
         int i = 0;
+        
         for (String link : links) {
             i++;
             try {
@@ -103,7 +104,7 @@ public class ScrapingApplication {
                         
                
                 try (PrintWriter out = new PrintWriter(contentName)) {
-                    out.println(title);
+                    out.println(content.html());
                 }
                 
             } catch (IOException ex) {
