@@ -5,12 +5,11 @@
  */
 package scraping.application;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import org.apache.commons.cli.ParseException;
-import folderhierarchy.FolderHierarchy;
+
 
 
 /**
@@ -31,5 +30,19 @@ public class ScrapingApplication {
 
         CLParser parser = new CLParser(myArgs);
         new ProccessingData(parser.getLinks());    
+        ScrapingApplication b = new ScrapingApplication();
+        File files = b.getFile("site-name");
+        File[] f = files.listFiles();
+        for (File ff: f) {
+            System.out.println(ff.getPath());
+        }
+        
     }
+    
+    public File getFile(String fileName) {
+	ClassLoader classLoader = getClass().getClassLoader();
+	File file = new File(classLoader.getResource(fileName).getPath());
+        System.out.println(file.getAbsolutePath());
+	return file;
+  }
 }

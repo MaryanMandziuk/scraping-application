@@ -22,15 +22,9 @@ public class ProccessingData {
     private final String PAGE_EXT = ".page";
     private final String TMPL_EXT = ".tmpl";
     private final ExecutorService executor;
-    private final String STRUCTURE = "$file_structure_top\n" +
-                                "  $file_articles_article1Title\n" +
-                                "  $file_structure_fulltop\n" +
-                                "    $file_articles_article1\n" +
-                                "$file_structure_bottom";
-    
-    
     
     public ProccessingData(List<String> links) {
+        
         final int cores = Runtime.getRuntime().availableProcessors();
         executor = Executors.newFixedThreadPool(cores);
         
@@ -43,7 +37,13 @@ public class ProccessingData {
             String contentName = "article" + i + TMPL_EXT;
             String articleStructureName = "article" + i + PAGE_EXT;
             String articleHeader = "<h2 class=\"featurette-heading\">$file_articles_article"+i+"Title</h2>";
+            String structure = "$file_structure_top\n" +
+                                "  $file_articles_articleTitle" + i + "\n" +
+                                "  $file_structure_fulltop\n" +
+                                "    $file_articles_article" + i + "\n" +
+                                "$file_structure_bottom";
             executor.execute(() -> {
+                
                 String threadName = Thread.currentThread().getName();
                 System.out.println("Hello " + threadName);
 
@@ -63,29 +63,23 @@ public class ProccessingData {
                         out.println(content.html());
                     }
                     try (PrintWriter out = new PrintWriter(articleStructureName)) {
-                        out.println(STRUCTURE);
+                        out.println(structure);
                     }
 
                 } catch (IOException ex) {
                     System.err.println("Error: " + ex);    
                 }
             });
-            
-
-            }
-        shutdown();
-        
-            
+        }
+        shutdown();       
     }
     
-    
-    
+       
     public final void shutdown() {
         executor.shutdown(); 
         try {
-            
             executor.shutdown();
-            executor.awaitTermination(5, TimeUnit.SECONDS);
+            executor.awaitTermination(15, TimeUnit.SECONDS);
         }
         catch (InterruptedException e) {
 //            System.err.println("tasks interrupted");
