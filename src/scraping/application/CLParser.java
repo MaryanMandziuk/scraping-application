@@ -28,6 +28,7 @@ public class CLParser {
     private CommandLineParser parser = new DefaultParser();
     private Options options = new Options();
     private List<String> links = new ArrayList<>();
+    private File outputFolder;
     
     public CLParser(String[] args) throws ParseException, IOException {
         this.filesOption();
@@ -57,7 +58,7 @@ public class CLParser {
     
     private void proccessFilesOption(CommandLine cl) throws FileNotFoundException, IOException {
         File resources = new File(cl.getOptionValues("f")[0]);
-        File outputFolder = new File(cl.getOptionValues("f")[1]);
+        outputFolder = new File(cl.getOptionValues("f")[1]);
 
         if (!outputFolder.isDirectory()) {
             outputFolder.mkdir();
@@ -72,5 +73,9 @@ public class CLParser {
     
     public List getLinks() {
         return this.links;
+    }
+    
+    public File getOutputFolder() {
+        return outputFolder;
     }
 }

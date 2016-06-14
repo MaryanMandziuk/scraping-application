@@ -5,6 +5,7 @@
  */
 package scraping.application;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.List;
@@ -23,7 +24,7 @@ public class ProccessingData {
     private final String TMPL_EXT = ".tmpl";
     private final ExecutorService executor;
     
-    public ProccessingData(List<String> links) {
+    public ProccessingData(List<String> links, File outputFolder) {
         
         final int cores = Runtime.getRuntime().availableProcessors();
         executor = Executors.newFixedThreadPool(cores);
@@ -33,15 +34,15 @@ public class ProccessingData {
         for (String link : links) {
             
             i++;
-            String articleName = "articleTitle" + i + TMPL_EXT;
+            String articleName = "article" + i + "Title" + TMPL_EXT;
             String contentName = "article" + i + TMPL_EXT;
             String articleStructureName = "article" + i + PAGE_EXT;
-            String articleHeader = "<h2 class=\"featurette-heading\">$file_articles_article"+i+"Title</h2>";
-            String structure = "$file_structure_top\n" +
-                                "  $file_articles_articleTitle" + i + "\n" +
-                                "  $file_structure_fulltop\n" +
-                                "    $file_articles_article" + i + "\n" +
-                                "$file_structure_bottom";
+            String articleHeader = "<h2 class=\"featurette-heading\">$file-articles-article" + i + "Title</h2>";
+            String structure = "$file-structure-top\n" +
+                                "  $file-articles-article" + i + "Title\n" +
+                                "  $file-structure-fulltop\n" +
+                                "    $file-articles-article" + i + "\n" +
+                                "$file-structure-bottom";
             executor.execute(() -> {
                 
                 String threadName = Thread.currentThread().getName();
@@ -55,14 +56,14 @@ public class ProccessingData {
 
                     content.getElementsByTag("div").remove();
                     
-                    try (PrintWriter out = new PrintWriter(articleName)) {
+                    try (PrintWriter out = new PrintWriter(outputFolder + File.separator + articleName)) {
                         out.println(title);
                     }
-                    try (PrintWriter out = new PrintWriter(contentName)) {
+                    try (PrintWriter out = new PrintWriter(outputFolder + File.separator + contentName)) {
                         out.println(articleHeader);
                         out.println(content.html());
                     }
-                    try (PrintWriter out = new PrintWriter(articleStructureName)) {
+                    try (PrintWriter out = new PrintWriter(outputFolder + File.separator + articleStructureName)) {
                         out.println(structure);
                     }
 
@@ -83,7 +84,7 @@ public class ProccessingData {
         }
         catch (InterruptedException e) {
 //            System.err.println("tasks interrupted");
-//            Thread.currentThread().interrupt();
+            Thread.currentThread().interrupt();
         }
         finally {
             executor.shutdownNow();

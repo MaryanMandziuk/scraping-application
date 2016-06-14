@@ -5,11 +5,9 @@
  */
 package scraping.application;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import org.apache.commons.cli.ParseException;
-
 
 
 /**
@@ -26,23 +24,9 @@ public class ScrapingApplication {
      */
     public static void main(String[] args) throws FileNotFoundException, IOException, ParseException {
 
-        String[] myArgs = {"-f", "links.txt", "2"};
+        String[] myArgs = {"-f", "links.txt", "articles"};
 
         CLParser parser = new CLParser(myArgs);
-        new ProccessingData(parser.getLinks());    
-        ScrapingApplication b = new ScrapingApplication();
-        File files = b.getFile("site-name");
-        File[] f = files.listFiles();
-        for (File ff: f) {
-            System.out.println(ff.getPath());
-        }
-        
+        new ProccessingData(parser.getLinks(), parser.getOutputFolder());    
     }
-    
-    public File getFile(String fileName) {
-	ClassLoader classLoader = getClass().getClassLoader();
-	File file = new File(classLoader.getResource(fileName).getPath());
-        System.out.println(file.getAbsolutePath());
-	return file;
-  }
 }
