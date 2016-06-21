@@ -15,6 +15,7 @@ import org.jsoup.nodes.Element;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.jsoup.select.Elements;
 /**
  *
  * @author maryan
@@ -37,12 +38,12 @@ public class ProccessingData {
             String articleName = "article" + i + "Title" + TMPL_EXT;
             String contentName = "article" + i + TMPL_EXT;
             String articleStructureName = "article" + i + PAGE_EXT;
-            String articleHeader = "<h2 class=\"featurette-heading\">$file-articles-article" + i + "Title</h2>";
-            String structure = "$file-structure-top\n" +
-                                "  $file-articles-article" + i + "Title\n" +
-                                "  $file-structure-fulltop\n" +
-                                "    $file-articles-article" + i + "\n" +
-                                "$file-structure-bottom";
+            String articleHeader = "<h2 class=\"featurette-heading\">$!{file_articles_article" + i + "Title}</h2>";
+            String structure = "$!{file_structure_top}\n" +
+                                "  $!{file_articles_article" + i + "Title}\n" +
+                                "  $!{file_structure_fulltop}\n" +
+                                "    $!{file_articles_article" + i + "}\n" +
+                                "$!{file_structure_bottom}";
             executor.execute(() -> {
                 
                 String threadName = Thread.currentThread().getName();
@@ -54,8 +55,20 @@ public class ProccessingData {
                     String title = doc.getElementsByTag("title").text().replaceAll(" - Лео творит!", "");
                     Element content = doc.getElementsByClass("entry-content").get(0);
 
-                    content.getElementsByTag("div").remove();
-                    
+//                    content.getElementsByTag("div").remove();
+                    content.getElementsByTag("br").remove();
+                    content.prepend("<p>");
+                            
+                            for(Element el : content.children()){
+                                System.out.println("el-"+el +"  " + el.val());
+                                if(el.tag().toString() == "img") {
+                                    el.before("</p>");
+                                    el.after("<p>");
+                                    
+                                }
+                                
+                            }
+                        
                     try (PrintWriter out = new PrintWriter(outputFolder + File.separator + articleName)) {
                         out.println(title);
                     }
