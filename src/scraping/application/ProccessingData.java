@@ -5,9 +5,11 @@
  */
 package scraping.application;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.URL;
 import java.util.List;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -15,6 +17,10 @@ import org.jsoup.nodes.Element;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.imageio.ImageIO;
+import net.coobird.thumbnailator.Thumbnails;
+import net.coobird.thumbnailator.name.Rename;
+import org.apache.commons.io.FileUtils;
 import org.jsoup.select.Elements;
 /**
  *
@@ -25,11 +31,18 @@ public class ProccessingData {
     private final String TMPL_EXT = ".tmpl";
     private final ExecutorService executor;
     
-    public ProccessingData(List<String> links, File outputFolder) {
+    public ProccessingData(List<String> links, File outputFolder) throws IOException {
         
         final int cores = Runtime.getRuntime().availableProcessors();
         executor = Executors.newFixedThreadPool(cores);
         
+        
+        File imagesFolder = new File(outputFolder + File.separator + "images");
+        if (!imagesFolder.exists()) {
+            if (!imagesFolder.mkdir()) {
+                System.err.println("Enable to create images folder");
+            }
+        }
         int i = 0;
         
         for (String link : links) {
@@ -44,10 +57,11 @@ public class ProccessingData {
                                 "  $!{file_articles_article" + i + "MetaTag}\n" +
                                 "   $!{file_structure_titleOpen}\n" +
                                 "       $!{file_articles_article" + i + "Title}\n" +
-                                "   $!{file_structure_titleColse}\n" + 
+                                "   $!{file_structure_titleClose}\n" + 
                                 "  $!{file_structure_fulltop}\n" +
                                 "    $!{file_articles_article" + i + "}\n" +
                                 "$!{file_structure_bottom}";
+            File destination = new File(imagesFolder + File.separator + "articleImage" + i);
             executor.execute(() -> {
                 
                 String threadName = Thread.currentThread().getName();
@@ -55,7 +69,7 @@ public class ProccessingData {
 
                 try {
 
-                    Document doc = Jsoup.connect(link).timeout(5000).get();
+                    Document doc = Jsoup.connect(link).timeout(10000).get();
                     String title = doc.getElementsByTag("title").text().replaceAll(" - Лео творит!", "");
                     Elements metaTags = doc.getElementsByAttributeValue("property", "article:tag");
                     Element content = doc.getElementsByClass("entry-content").get(0);
@@ -63,9 +77,13 @@ public class ProccessingData {
                     content.getElementsByTag("div").remove();
                     content.getElementsByAttributeValue("name", "cutid1").remove();
                     content.getElementsByAttributeValue("name", "cutid1-end").remove();
+                    content.getElementsByAttributeValue("class", "i-ljuser-userhead").remove();
+
                     
-                   
                     
+                    URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
+                    
+                    FileUtils.copyURLToFile(imageUrl,  destination);
 //                    content.getElementsByTag("br").remove();
 //                    content.prepend("<p>");
 //                            
@@ -98,10 +116,14 @@ public class ProccessingData {
                 }
             });
         }
-        shutdown();       
+            shutdown();    
+            Thumbnails.of(imagesFolder.listFiles())
+            .size(720, 560)
+            .outputFormat("jpg")
+            .toFiles(Rename.PREFIX_HYPHEN_THUMBNAIL);
     }
     
-       
+           
     public final void shutdown() {
         executor.shutdown(); 
         try {
