@@ -9,6 +9,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.math.BigInteger;
 import java.net.URL;
 import java.util.List;
 import org.jsoup.Jsoup;
@@ -30,6 +31,8 @@ public class ProccessingData {
     private final String PAGE_EXT = ".page";
     private final String TMPL_EXT = ".tmpl";
     private final ExecutorService executor;
+    private final int WIDTH_PROPORTION = 9;
+    private final int HEIGHT_PROPORTION = 7;
     
     public ProccessingData(List<String> links, File outputFolder) throws IOException {
         
@@ -46,6 +49,7 @@ public class ProccessingData {
         int i = 0;
         
         for (String link : links) {
+            
             
             i++;
             String articleName = "article" + i + "Title" + TMPL_EXT;
@@ -68,34 +72,20 @@ public class ProccessingData {
                 System.out.println("Hello " + threadName);
 
                 try {
-
-                    Document doc = Jsoup.connect(link).timeout(10000).get();
+                    Document doc = Jsoup.connect(link).timeout(5000).get();
                     String title = doc.getElementsByTag("title").text().replaceAll(" - Лео творит!", "");
                     Elements metaTags = doc.getElementsByAttributeValue("property", "article:tag");
                     Element content = doc.getElementsByClass("entry-content").get(0);
-
+                        
                     content.getElementsByTag("div").remove();
                     content.getElementsByAttributeValue("name", "cutid1").remove();
                     content.getElementsByAttributeValue("name", "cutid1-end").remove();
                     content.getElementsByAttributeValue("class", "i-ljuser-userhead").remove();
-
-                    
+                    content.getElementsByTag("img").attr("class", "img-responsive");
                     
                     URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
-                    
-                    FileUtils.copyURLToFile(imageUrl,  destination);
-//                    content.getElementsByTag("br").remove();
-//                    content.prepend("<p>");
-//                            
-//                            for(Element el : content.children()){
-//                                System.out.println("el-"+el +"  " + el.val());
-//                                if(el.tag().toString() == "img") {
-//                                    el.before("</p>");
-//                                    el.after("<p>");
-//                                    
-//                                }
-//                                
-//                            }
+                    proccessImage(imageUrl, destination);
+//                    FileUtils.copyURLToFile(imageUrl,  destination);
                     
                     try (PrintWriter out = new PrintWriter(outputFolder + File.separator + articleMetaTags)) {
                         out.println(metaTags);
@@ -115,20 +105,47 @@ public class ProccessingData {
                     System.err.println("Error: " + ex);    
                 }
             });
+        
         }
             shutdown();    
-            Thumbnails.of(imagesFolder.listFiles())
-            .size(720, 560)
-            .outputFormat("jpg")
-            .toFiles(Rename.PREFIX_HYPHEN_THUMBNAIL);
+           
     }
     
+    private int getProportion(int width, int height) {
+        
+        int a = width / WIDTH_PROPORTION;
+        int b = height / HEIGHT_PROPORTION;    
+        
+        if ( a < b) {
+            return a;
+        }
+        return b;
+    }
+    
+    private void proccessImage(URL imageUrl, File destination) {
+        BufferedImage img = null;
+        try {
+            img = ImageIO.read(imageUrl);
+        } catch (IOException e) {
+            System.err.println("Error read image: " + e);
+        }
+        int p = getProportion(img.getWidth(), img.getHeight());
+       
+        img = img.getSubimage(0, 0, p * WIDTH_PROPORTION, p * HEIGHT_PROPORTION);
+        
+        try {
+            
+            ImageIO.write(img, "png", destination);
+        } catch (IOException e) {
+             System.err.println("Error write image: " + e);
+        }
+    }
            
     public final void shutdown() {
         executor.shutdown(); 
         try {
             executor.shutdown();
-            executor.awaitTermination(15, TimeUnit.SECONDS);
+            executor.awaitTermination(55, TimeUnit.SECONDS);
         }
         catch (InterruptedException e) {
 //            System.err.println("tasks interrupted");
