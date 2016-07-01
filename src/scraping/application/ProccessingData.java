@@ -9,9 +9,12 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.math.BigInteger;
 import java.net.URL;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -19,9 +22,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
-import net.coobird.thumbnailator.Thumbnails;
-import net.coobird.thumbnailator.name.Rename;
-import org.apache.commons.io.FileUtils;
 import org.jsoup.select.Elements;
 /**
  *
@@ -82,7 +82,9 @@ public class ProccessingData {
                     content.getElementsByAttributeValue("name", "cutid1-end").remove();
                     content.getElementsByAttributeValue("class", "i-ljuser-userhead").remove();
                     content.getElementsByTag("img").attr("class", "img-responsive");
-                    
+
+//                    getEnglishWords(content.text());
+                    getFrequencyWords(content.text());
                     URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
                     proccessImage(imageUrl, destination);
 //                    FileUtils.copyURLToFile(imageUrl,  destination);
@@ -155,5 +157,42 @@ public class ProccessingData {
             executor.shutdownNow();
             System.out.println("Scraping finished");
         }
+    }
+    
+    private String getEnglishWords(String text) {
+        final String pattern = "([\\w-&&[^0-9]]+)";
+        Pattern p = Pattern.compile(pattern);
+        Matcher m = p.matcher(text);
+        StringBuilder s = new StringBuilder();
+        while (m.find()) {
+            String word = m.group();
+            s.append(word);
+            s.append(", ");
+        }
+        s.delete(s.length() - 2, s.length() -1);
+        System.out.println("builder: " + s.toString());
+        return "";
+    }
+    
+    private String getFrequencyWords(String text) {
+        Map<String, Integer> countWords = new HashMap<>();
+        String[] arr = text.split("\\s");
+        for (int i = 0; i < arr.length; i++) {
+            if (countWords.containsKey(arr[i])) {
+                countWords.replace(arr[i], countWords.get(arr[i]) + 1);
+            } else {
+                countWords.put(arr[i], 1);
+            }
+        }
+        StringBuilder s = new StringBuilder();
+        for( String key: countWords.keySet()) {
+            if (countWords.get(key) > 2 && key.length() > 3) {
+                s.append(key);
+                s.append(", ");
+            }
+        }
+//        s.delete(s.length() - 2, s.length() -1);
+        System.out.println("builder: " + s.toString());
+        return "";
     }
 }
