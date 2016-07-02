@@ -22,6 +22,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
+import org.jsoup.parser.Tag;
 import org.jsoup.select.Elements;
 /**
  *
@@ -65,6 +66,8 @@ public class ProccessingData {
                                 "  $!{file_structure_fulltop}\n" +
                                 "    $!{file_articles_article" + i + "}\n" +
                                 "$!{file_structure_bottom}";
+            
+            
             File destination = new File(imagesFolder + File.separator + "articleImage" + i);
             executor.execute(() -> {
                 
@@ -76,21 +79,25 @@ public class ProccessingData {
                     String title = doc.getElementsByTag("title").text().replaceAll(" - Лео творит!", "");
                     Elements metaTags = doc.getElementsByAttributeValue("property", "article:tag");
                     Element content = doc.getElementsByClass("entry-content").get(0);
-                        
+                    
+                    
                     content.getElementsByTag("div").remove();
                     content.getElementsByAttributeValue("name", "cutid1").remove();
                     content.getElementsByAttributeValue("name", "cutid1-end").remove();
                     content.getElementsByAttributeValue("class", "i-ljuser-userhead").remove();
                     content.getElementsByTag("img").attr("class", "img-responsive");
-
+                    translit(title);
 //                    getEnglishWords(content.text());
-                    getFrequencyWords(content.text());
+                    Element keywords = new Element(Tag.valueOf("meta"), "").attr("name", "keywords")
+                            .attr("content", getEnglishWords(content.text()));
+//                    getFrequencyWords(content.text());
                     URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
                     proccessImage(imageUrl, destination);
 //                    FileUtils.copyURLToFile(imageUrl,  destination);
                     
                     try (PrintWriter out = new PrintWriter(outputFolder + File.separator + articleMetaTags)) {
                         out.println(metaTags);
+                        out.println(keywords);
                     }
                     try (PrintWriter out = new PrintWriter(outputFolder + File.separator + articleName)) {
                         out.println(title);
@@ -160,18 +167,32 @@ public class ProccessingData {
     }
     
     private String getEnglishWords(String text) {
-        final String pattern = "([\\w-&&[^0-9]]+)";
+        final String pattern = "(\\w+-\\w+-\\w+)|([\\w&&[^0-9]]+-\\w+)|([\\w&&[^0-9]]+)";
         Pattern p = Pattern.compile(pattern);
         Matcher m = p.matcher(text);
+        Map<String, Integer> countWords = new HashMap<>();
         StringBuilder s = new StringBuilder();
         while (m.find()) {
             String word = m.group();
-            s.append(word);
-            s.append(", ");
+            if (countWords.containsKey(word)) {
+                countWords.replace(word, countWords.get(word) + 1);
+            } else {
+                countWords.put(word, 1);
+            }
         }
-        s.delete(s.length() - 2, s.length() -1);
-        System.out.println("builder: " + s.toString());
-        return "";
+        
+        for (String key: countWords.keySet()) {
+            if (key.length() >= 3) {
+                s.append(key);
+                s.append(", ");
+            }
+        }
+        
+        if (s.length() > 0) {
+            s.delete(s.length() - 2, s.length() );
+        }
+        
+        return s.toString();
     }
     
     private String getFrequencyWords(String text) {
@@ -193,6 +214,37 @@ public class ProccessingData {
         }
 //        s.delete(s.length() - 2, s.length() -1);
         System.out.println("builder: " + s.toString());
+        return "";
+    }
+    
+    private String translit(String title) {
+        String[] russian = {"а","б","в","г","д","е","ё","ж", "з","и","й","к","л","м",
+            "н","о","п","р","с","т","у","ф","х", "ц", "ч", "ш", "щ",
+            "ъ","ы","ь","э","ю", "я","і","ї","є",
+             "А","Б","В","Г","Д","Е","Ё","Ж", "З","И","Й","К","Л","М","Н","О","П",
+             "Р","С","Т","У","Ф","Х", "Ц", "Ч", "Ш", "Щ","Ъ","Ы","Ь","Э","Ю", "Я","І","Ї","Є"," "};
+        String[] translit = {"a","b","v","g","d","e","e","zh","z","i","y","k","l",
+            "m","n","o","p","r","s","t","u","f","kh","tc","ch","sh","shch","", "y",
+            "","e","iu","ya","i","i","e","A","B","V","G","D","E","E","Zh","Z","I",
+            "Y","K","L","M","N","O","P","R","S","T","U","F","Kh","Tc","Ch","Sh","Shch",
+            "", "Y", "","E","Iu","ya","I","I","E","-"};
+        Map<String, String> map = new HashMap<>();
+        for(int i = 0; i < russian.length; i++) {
+            map.put(russian[i], translit[i]);
+        }
+        
+        StringBuilder s = new StringBuilder();
+        String[] arr = title.split("");
+        for (int i = 0; i < arr.length; i++) {
+            String tmp = map.get(arr[i]);
+            if (tmp == null) {
+                s.append(arr[i]);
+            } else {
+                s.append(map.get(arr[i])); 
+            }
+        }
+        System.out.println(title);
+        System.out.println(s);
         return "";
     }
 }
