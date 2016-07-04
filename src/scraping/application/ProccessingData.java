@@ -86,6 +86,11 @@ public class ProccessingData {
                     content.getElementsByAttributeValue("name", "cutid1-end").remove();
                     content.getElementsByAttributeValue("class", "i-ljuser-userhead").remove();
                     content.getElementsByTag("img").attr("class", "img-responsive");
+                    content.select("img + br").remove();
+                    content.child(0).lastElementSibling().remove();
+                    
+
+                    
                     translit(title);
 //                    getEnglishWords(content.text());
                     Element keywords = new Element(Tag.valueOf("meta"), "").attr("name", "keywords")
@@ -213,7 +218,7 @@ public class ProccessingData {
             }
         }
 //        s.delete(s.length() - 2, s.length() -1);
-        System.out.println("builder: " + s.toString());
+//        System.out.println("builder: " + s.toString());
         return "";
     }
     
@@ -228,6 +233,7 @@ public class ProccessingData {
             "","e","iu","ya","i","i","e","A","B","V","G","D","E","E","Zh","Z","I",
             "Y","K","L","M","N","O","P","R","S","T","U","F","Kh","Tc","Ch","Sh","Shch",
             "", "Y", "","E","Iu","ya","I","I","E","-"};
+        String[] unsupported = {".",",","!","?",":",";","\"","'"};
         Map<String, String> map = new HashMap<>();
         for(int i = 0; i < russian.length; i++) {
             map.put(russian[i], translit[i]);
@@ -238,13 +244,23 @@ public class ProccessingData {
         for (int i = 0; i < arr.length; i++) {
             String tmp = map.get(arr[i]);
             if (tmp == null) {
-                s.append(arr[i]);
-            } else {
-                s.append(map.get(arr[i])); 
+                if (!isSupported(arr[i], unsupported)) {
+                    s.append(arr[i]);
+                }
+            } 
+            else  {
+                s.append(tmp); 
+            } 
+        }
+        return s.toString();
+    }
+    
+    private boolean isSupported(String t, String[] un) {  
+        for(int i = 0; i < un.length; i ++) {
+            if (t.equals(un[i])) { 
+                return true;
             }
         }
-        System.out.println(title);
-        System.out.println(s);
-        return "";
+        return false;
     }
 }
