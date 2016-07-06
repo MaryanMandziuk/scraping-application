@@ -6,11 +6,16 @@
 package scraping.application;
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -22,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
+import org.apache.commons.io.FileUtils;
 import org.jsoup.parser.Tag;
 import org.jsoup.select.Elements;
 /**
@@ -40,6 +46,12 @@ public class ProccessingData {
         final int cores = Runtime.getRuntime().availableProcessors();
         executor = Executors.newFixedThreadPool(cores);
         
+        File articles = new File(outputFolder + File.separator + "articles");
+        if (!articles.exists()) {
+            if (!articles.mkdir()) {
+                System.err.println("Enable to create articles folder");
+            }
+        }
         
         File imagesFolder = new File(outputFolder + File.separator + "images");
         if (!imagesFolder.exists()) {
@@ -47,16 +59,23 @@ public class ProccessingData {
                 System.err.println("Enable to create images folder");
             }
         }
-        int i = 0;
         
+        File articleBox = new File(outputFolder + File.separator + "articleBox");
+        if (!articleBox.exists()) {
+            if (!articleBox.mkdir()) {
+                System.err.println("Enable to create articleBox folder");
+            }
+        }
+
+        int i = 0;
+        Map<String, Integer> map = new HashMap<>();
         for (String link : links) {
             
             
             i++;
-            String articleName = "article" + i + "Title" + TMPL_EXT;
-            String contentName = "article" + i + TMPL_EXT;
+            String articleName = "article" + i + "Title" ;
+            String contentName = "article" + i ;
             String articleMetaTags = "article" + i + "MetaTag" + TMPL_EXT;
-            String articleStructureName = "article" + i + PAGE_EXT;
             String articleHeader = "<h2 class=\"featurette-heading\">$!{file_articles_article" + i + "Title}</h2>";
             String structure = "$!{file_structure_top}\n" +
                                 "  $!{file_articles_article" + i + "MetaTag}\n" +
@@ -65,10 +84,11 @@ public class ProccessingData {
                                 "   $!{file_structure_titleClose}\n" + 
                                 "  $!{file_structure_fulltop}\n" +
                                 "    $!{file_articles_article" + i + "}\n" +
+                                "  $!{file_pager_article" + i + "}\n" +
                                 "$!{file_structure_bottom}";
-            
-            
-            File destination = new File(imagesFolder + File.separator + "articleImage" + i);
+            String articleBoxFile = "article" + i + "Box";
+            String articleImage = "articleImage" + i;
+            File destination = new File(imagesFolder + File.separator + articleImage);
             executor.execute(() -> {
                 
                 String threadName = Thread.currentThread().getName();
@@ -80,6 +100,14 @@ public class ProccessingData {
                     Elements metaTags = doc.getElementsByAttributeValue("property", "article:tag");
                     Element content = doc.getElementsByClass("entry-content").get(0);
                     
+                    for(Element el: metaTags) {
+                        String teg = el.attr("content");
+                        if (map.containsKey(teg)) {
+                            map.replace(teg, map.get(teg)+1);
+                        } else {
+                            map.put(teg, 1);
+                        }
+                    }
                     
                     content.getElementsByTag("div").remove();
                     content.getElementsByAttributeValue("name", "cutid1").remove();
@@ -89,31 +117,41 @@ public class ProccessingData {
                     content.select("img + br").remove();
                     content.child(0).lastElementSibling().remove();
                     
+                    String articleStructureName = translit(title) + PAGE_EXT;
+                    
+                    String articleBoxContent = "<a href=\"$!{root}/articles/"+ translit(title) +".html\">"
+                            + " <img class=\"img-responsive\" src=\"$!{root}/images/"+articleImage+"\"/></a>\n" +
+                            "<h2 class=\"box-title\"><a href=\"$!{root}/articles/"+translit(title)+".html\""
+                            + " rel=\"bookmark\">$!{file_articles_"+articleName+"}</a></h2>";
 
                     
-                    translit(title);
-//                    getEnglishWords(content.text());
                     Element keywords = new Element(Tag.valueOf("meta"), "").attr("name", "keywords")
                             .attr("content", getEnglishWords(content.text()));
-//                    getFrequencyWords(content.text());
+
                     URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
                     proccessImage(imageUrl, destination);
-//                    FileUtils.copyURLToFile(imageUrl,  destination);
+
+                   
                     
-                    try (PrintWriter out = new PrintWriter(outputFolder + File.separator + articleMetaTags)) {
+                    try (PrintWriter out = new PrintWriter(articles + File.separator + articleMetaTags)) {
                         out.println(metaTags);
                         out.println(keywords);
                     }
-                    try (PrintWriter out = new PrintWriter(outputFolder + File.separator + articleName)) {
+                    try (PrintWriter out = new PrintWriter(articles + File.separator + articleName + TMPL_EXT)) {
                         out.println(title);
                     }
-                    try (PrintWriter out = new PrintWriter(outputFolder + File.separator + contentName)) {
+                    try (PrintWriter out = new PrintWriter(articles + File.separator + contentName + TMPL_EXT)) {
                         out.println(articleHeader);
                         out.println(content.html());
                     }
-                    try (PrintWriter out = new PrintWriter(outputFolder + File.separator + articleStructureName)) {
+                    try (PrintWriter out = new PrintWriter(articles + File.separator + articleStructureName)) {
                         out.println(structure);
                     }
+                    try (PrintWriter out = new PrintWriter(articleBox + File.separator + articleBoxFile + TMPL_EXT)) {
+                        out.println(articleBoxContent);
+                    }
+
+                    
 
                 } catch (IOException ex) {
                     System.err.println("Error: " + ex);    
@@ -122,7 +160,12 @@ public class ProccessingData {
         
         }
             shutdown();    
-           
+        File out = new File(outputFolder + File.separator + "teg.txt");
+        for (Map.Entry pair : map.entrySet()) {
+            System.out.println(pair.getKey() + " = " + pair.getValue());
+            
+            FileUtils.writeStringToFile(out , pair.getKey() + " = " + pair.getValue() +"\n" , true);
+        }
     }
     
     private int getProportion(int width, int height) {
@@ -200,27 +243,27 @@ public class ProccessingData {
         return s.toString();
     }
     
-    private String getFrequencyWords(String text) {
-        Map<String, Integer> countWords = new HashMap<>();
-        String[] arr = text.split("\\s");
-        for (int i = 0; i < arr.length; i++) {
-            if (countWords.containsKey(arr[i])) {
-                countWords.replace(arr[i], countWords.get(arr[i]) + 1);
-            } else {
-                countWords.put(arr[i], 1);
-            }
-        }
-        StringBuilder s = new StringBuilder();
-        for( String key: countWords.keySet()) {
-            if (countWords.get(key) > 2 && key.length() > 3) {
-                s.append(key);
-                s.append(", ");
-            }
-        }
-//        s.delete(s.length() - 2, s.length() -1);
-//        System.out.println("builder: " + s.toString());
-        return "";
-    }
+//    private String getFrequencyWords(String text) {
+//        Map<String, Integer> countWords = new HashMap<>();
+//        String[] arr = text.split("\\s");
+//        for (int i = 0; i < arr.length; i++) {
+//            if (countWords.containsKey(arr[i])) {
+//                countWords.replace(arr[i], countWords.get(arr[i]) + 1);
+//            } else {
+//                countWords.put(arr[i], 1);
+//            }
+//        }
+//        StringBuilder s = new StringBuilder();
+//        for( String key: countWords.keySet()) {
+//            if (countWords.get(key) > 2 && key.length() > 3) {
+//                s.append(key);
+//                s.append(", ");
+//            }
+//        }
+////        s.delete(s.length() - 2, s.length() -1);
+////        System.out.println("builder: " + s.toString());
+//        return "";
+//    }
     
     private String translit(String title) {
         String[] russian = {"а","б","в","г","д","е","ё","ж", "з","и","й","к","л","м",
@@ -251,6 +294,9 @@ public class ProccessingData {
             else  {
                 s.append(tmp); 
             } 
+        }
+        while (s.charAt(s.length()-1) == '-') {
+            s.setLength(s.length()-1);
         }
         return s.toString();
     }

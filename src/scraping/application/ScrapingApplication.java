@@ -24,7 +24,7 @@ public class ScrapingApplication {
      */
     public static void main(String[] args) throws FileNotFoundException, IOException, ParseException {
 
-        String[] myArgs = {"-f", "links.txt", "articles"};
+        String[] myArgs = {"-f", "links.txt", "site"};
         
         CLParser parser = new CLParser(myArgs);
         new ProccessingData(parser.getLinks(), parser.getOutputFolder());
