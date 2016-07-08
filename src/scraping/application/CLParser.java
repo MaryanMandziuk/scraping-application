@@ -20,7 +20,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 /**
- *
+ * Class for working with command line
  * @author maryan
  */
 public class CLParser {

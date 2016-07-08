@@ -6,16 +6,11 @@
 package scraping.application;
 
 import java.awt.image.BufferedImage;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.net.URL;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -31,20 +26,31 @@ import org.apache.commons.io.FileUtils;
 import org.jsoup.parser.Tag;
 import org.jsoup.select.Elements;
 /**
- *
+ * Class for scarping web data
  * @author maryan
  */
 public class ProccessingData {
+    
     private final String PAGE_EXT = ".page";
     private final String TMPL_EXT = ".tmpl";
     private final ExecutorService executor;
     private final int WIDTH_PROPORTION = 9;
     private final int HEIGHT_PROPORTION = 7;
     
+    /**
+     * Constructor which is gets, cleans web data
+     * @param links
+     * @param outputFolder
+     * @throws IOException 
+     */
     public ProccessingData(List<String> links, File outputFolder) throws IOException {
+        
+        System.out.print("Scaping starting");
         
         final int cores = Runtime.getRuntime().availableProcessors();
         executor = Executors.newFixedThreadPool(cores);
+        int i = 0;
+        Map<String, Integer> map = new HashMap<>();
         
         File articles = new File(outputFolder + File.separator + "articles");
         if (!articles.exists()) {
@@ -67,14 +73,12 @@ public class ProccessingData {
             }
         }
 
-        int i = 0;
-        Map<String, Integer> map = new HashMap<>();
+
         for (String link : links) {
             
-            
             i++;
-            String articleName = "article" + i + "Title" ;
-            String contentName = "article" + i ;
+            String articleName = "article" + i + "Title";
+            String contentName = "article" + i;
             String articleMetaTags = "article" + i + "MetaTag" + TMPL_EXT;
             String articleHeader = "<h2 class=\"featurette-heading\">$!{file_articles_article" + i + "Title}</h2>";
             String structure = "$!{file_structure_top}\n" +
@@ -89,11 +93,9 @@ public class ProccessingData {
             String articleBoxFile = "article" + i + "Box";
             String articleImage = "articleImage" + i;
             File destination = new File(imagesFolder + File.separator + articleImage);
+            
             executor.execute(() -> {
-                
-                String threadName = Thread.currentThread().getName();
-                System.out.println("Hello " + threadName);
-
+                System.out.print("...");
                 try {
                     Document doc = Jsoup.connect(link).timeout(5000).get();
                     String title = doc.getElementsByTag("title").text().replaceAll(" - Лео творит!", "");
@@ -118,20 +120,14 @@ public class ProccessingData {
                     content.child(0).lastElementSibling().remove();
                     
                     String articleStructureName = translit(title) + PAGE_EXT;
-                    
                     String articleBoxContent = "<a href=\"$!{root}/articles/"+ translit(title) +".html\">"
                             + " <img class=\"img-responsive\" src=\"$!{root}/images/"+articleImage+"\"/></a>\n" +
                             "<h2 class=\"box-title\"><a href=\"$!{root}/articles/"+translit(title)+".html\""
                             + " rel=\"bookmark\">$!{file_articles_"+articleName+"}</a></h2>";
-
-                    
                     Element keywords = new Element(Tag.valueOf("meta"), "").attr("name", "keywords")
                             .attr("content", getEnglishWords(content.text()));
-
                     URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
-                    proccessImage(imageUrl, destination);
-
-                   
+                    proccessImage(imageUrl, destination);  
                     
                     try (PrintWriter out = new PrintWriter(articles + File.separator + articleMetaTags)) {
                         out.println(metaTags);
@@ -151,34 +147,49 @@ public class ProccessingData {
                         out.println(articleBoxContent);
                     }
 
-                    
-
                 } catch (IOException ex) {
                     System.err.println("Error: " + ex);    
                 }
-            });
-        
+            });   
         }
-            shutdown();    
+        shutdown();    
         File out = new File(outputFolder + File.separator + "teg.txt");
         for (Map.Entry pair : map.entrySet()) {
-            System.out.println(pair.getKey() + " = " + pair.getValue());
-            
             FileUtils.writeStringToFile(out , pair.getKey() + " = " + pair.getValue() +"\n" , true);
         }
     }
     
+    /**
+     * Method for finding image proportion value
+     * @param width
+     * @param height
+     * @return proportion
+     */
     private int getProportion(int width, int height) {
         
-        int a = width / WIDTH_PROPORTION;
-        int b = height / HEIGHT_PROPORTION;    
+        int a = 0;
+        int b = 0;
         
-        if ( a < b) {
+        try {
+            if (width < 0 || height < 0) {
+                throw new IllegalArgumentException("Image width and height cannot be negative.");
+            }
+            a = width / WIDTH_PROPORTION;
+            b = height / HEIGHT_PROPORTION;    
+        } catch (ArithmeticException | IllegalArgumentException e) {
+            System.err.println("Error: " + e);
+        }
+        if (a < b) {
             return a;
         }
         return b;
     }
     
+    /**
+     * Method for cutting image with proportion
+     * @param imageUrl
+     * @param destination 
+     */
     private void proccessImage(URL imageUrl, File destination) {
         BufferedImage img = null;
         try {
@@ -197,31 +208,40 @@ public class ProccessingData {
              System.err.println("Error write image: " + e);
         }
     }
-           
-    public final void shutdown() {
+    
+    /**
+     * ExecutorService shutdown
+     */       
+    private final void shutdown() {
         executor.shutdown(); 
         try {
             executor.shutdown();
             executor.awaitTermination(55, TimeUnit.SECONDS);
         }
         catch (InterruptedException e) {
-//            System.err.println("tasks interrupted");
+            System.err.println("tasks interrupted" + e);
             Thread.currentThread().interrupt();
         }
         finally {
             executor.shutdownNow();
-            System.out.println("Scraping finished");
+            System.out.println("\nScraping finished");
         }
     }
     
-    private String getEnglishWords(String text) {
+    /**
+     * Getting english words in one example(distinct) from text data 
+     * @param text
+     * @return string with words
+     */
+    private String getEnglishWords(final String text) {
         final String pattern = "(\\w+-\\w+-\\w+)|([\\w&&[^0-9]]+-\\w+)|([\\w&&[^0-9]]+)";
         Pattern p = Pattern.compile(pattern);
         Matcher m = p.matcher(text);
         Map<String, Integer> countWords = new HashMap<>();
         StringBuilder s = new StringBuilder();
+        
         while (m.find()) {
-            String word = m.group();
+            final String word = m.group();
             if (countWords.containsKey(word)) {
                 countWords.replace(word, countWords.get(word) + 1);
             } else {
@@ -243,51 +263,34 @@ public class ProccessingData {
         return s.toString();
     }
     
-//    private String getFrequencyWords(String text) {
-//        Map<String, Integer> countWords = new HashMap<>();
-//        String[] arr = text.split("\\s");
-//        for (int i = 0; i < arr.length; i++) {
-//            if (countWords.containsKey(arr[i])) {
-//                countWords.replace(arr[i], countWords.get(arr[i]) + 1);
-//            } else {
-//                countWords.put(arr[i], 1);
-//            }
-//        }
-//        StringBuilder s = new StringBuilder();
-//        for( String key: countWords.keySet()) {
-//            if (countWords.get(key) > 2 && key.length() > 3) {
-//                s.append(key);
-//                s.append(", ");
-//            }
-//        }
-////        s.delete(s.length() - 2, s.length() -1);
-////        System.out.println("builder: " + s.toString());
-//        return "";
-//    }
-    
-    private String translit(String title) {
-        String[] russian = {"а","б","в","г","д","е","ё","ж", "з","и","й","к","л","м",
+    /**
+     * Translit method for url
+     * @param title
+     * @return translit string
+     */
+    private String translit(final String title) {
+        final String[] russian = {"а","б","в","г","д","е","ё","ж", "з","и","й","к","л","м",
             "н","о","п","р","с","т","у","ф","х", "ц", "ч", "ш", "щ",
             "ъ","ы","ь","э","ю", "я","і","ї","є",
              "А","Б","В","Г","Д","Е","Ё","Ж", "З","И","Й","К","Л","М","Н","О","П",
              "Р","С","Т","У","Ф","Х", "Ц", "Ч", "Ш", "Щ","Ъ","Ы","Ь","Э","Ю", "Я","І","Ї","Є"," "};
-        String[] translit = {"a","b","v","g","d","e","e","zh","z","i","y","k","l",
+        final String[] translit = {"a","b","v","g","d","e","e","zh","z","i","y","k","l",
             "m","n","o","p","r","s","t","u","f","kh","tc","ch","sh","shch","", "y",
             "","e","iu","ya","i","i","e","A","B","V","G","D","E","E","Zh","Z","I",
             "Y","K","L","M","N","O","P","R","S","T","U","F","Kh","Tc","Ch","Sh","Shch",
             "", "Y", "","E","Iu","ya","I","I","E","-"};
-        String[] unsupported = {".",",","!","?",":",";","\"","'"};
+        final String[] unsupported = {".",",","!","?",":",";","\"","'"};
         Map<String, String> map = new HashMap<>();
         for(int i = 0; i < russian.length; i++) {
             map.put(russian[i], translit[i]);
         }
         
         StringBuilder s = new StringBuilder();
-        String[] arr = title.split("");
+        final String[] arr = title.split("");
         for (int i = 0; i < arr.length; i++) {
             String tmp = map.get(arr[i]);
             if (tmp == null) {
-                if (!isSupported(arr[i], unsupported)) {
+                if (!isUnSupported(arr[i], unsupported)) {
                     s.append(arr[i]);
                 }
             } 
@@ -301,7 +304,13 @@ public class ProccessingData {
         return s.toString();
     }
     
-    private boolean isSupported(String t, String[] un) {  
+    /**
+     * Check for unsupported symbols
+     * @param t
+     * @param un
+     * @return bool value
+     */
+    private boolean isUnSupported(final String t,final String[] un) {  
         for(int i = 0; i < un.length; i ++) {
             if (t.equals(un[i])) { 
                 return true;
