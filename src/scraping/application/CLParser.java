@@ -29,15 +29,20 @@ public class CLParser {
     private Options options = new Options();
     private List<String> links = new ArrayList<>();
     private File outputFolder;
+    private boolean enableTeg = false;
     
     public CLParser(String[] args) throws ParseException, IOException {
         this.filesOption();
+        this.tegOption();
         
         try {
             
             CommandLine commandLine = parser.parse(options, args);
             if (commandLine.hasOption("f")) {
                 this.proccessFilesOption(commandLine);
+            }
+            if (commandLine.hasOption("t")) {
+                this.enableTeg = true;
             }
             
         } catch (ParseException ex) {
@@ -56,6 +61,10 @@ public class CLParser {
                 .build());
     }
     
+    private void tegOption() {
+        options.addOption("t", false, "enable teg");
+    }
+    
     private void proccessFilesOption(CommandLine cl) throws FileNotFoundException, IOException {
         File resources = new File(cl.getOptionValues("f")[0]);
         outputFolder = new File(cl.getOptionValues("f")[1]);
@@ -69,6 +78,10 @@ public class CLParser {
         for (String link; (link = read.readLine()) != null;) {
             this.links.add(link);
         }
+    }
+    
+    public boolean enableTeg() {
+        return this.enableTeg;
     }
     
     public List getLinks() {

@@ -7,10 +7,12 @@ package scraping.application;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -21,10 +23,16 @@ import org.jsoup.nodes.Element;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.FileImageOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.jsoup.parser.Tag;
 import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 /**
  * Class for scarping web data
  * @author maryan
@@ -36,127 +44,171 @@ public class ProccessingData {
     private final ExecutorService executor;
     private final int WIDTH_PROPORTION = 9;
     private final int HEIGHT_PROPORTION = 7;
-    
+    private final File article;
+    private final File imagesFolder;
+    private final File articleBox;
+    private Map<String, Integer> tegCount = new HashMap<>();
+    private final List<String> links;
+    private final File outputFolder;
+    private final boolean tegEnable;
+    private final Logger logger = LoggerFactory.getLogger(ProccessingData.class);
     /**
      * Constructor which is gets, cleans web data
      * @param links
      * @param outputFolder
+     * @param tegEnable
      * @throws IOException 
      */
-    public ProccessingData(List<String> links, File outputFolder) throws IOException {
-        
-        System.out.print("Scaping starting");
-        
-        final int cores = Runtime.getRuntime().availableProcessors();
-        executor = Executors.newFixedThreadPool(cores);
-        int i = 0;
-        Map<String, Integer> map = new HashMap<>();
-        
-        File articles = new File(outputFolder + File.separator + "articles");
-        if (!articles.exists()) {
-            if (!articles.mkdir()) {
-                System.err.println("Enable to create articles folder");
-            }
+    public ProccessingData(List<String> links, File outputFolder, boolean tegEnable) throws IOException {
+        this.links = links;
+        this.outputFolder = outputFolder;
+        this.article = createFolder("articles");
+        this.imagesFolder = createFolder("images");
+        this.articleBox = createFolder("articleBox");
+        this.tegEnable = tegEnable;
+        this.executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());   
+    }
+    
+    /**
+     * Iterating links
+     * @throws IOException 
+     */
+    public void proccessLinks() throws IOException {
+        System.out.print("Scrapping started");
+        int id = 1;
+        for(String link: this.links) {
+            proccessWebPage(link, Integer.toString(id));
+            id++;
         }
         
-        File imagesFolder = new File(outputFolder + File.separator + "images");
-        if (!imagesFolder.exists()) {
-            if (!imagesFolder.mkdir()) {
-                System.err.println("Enable to create images folder");
-            }
-        }
+        shutdown();
         
-        File articleBox = new File(outputFolder + File.separator + "articleBox");
-        if (!articleBox.exists()) {
-            if (!articleBox.mkdir()) {
-                System.err.println("Enable to create articleBox folder");
-            }
+        if (this.tegEnable) {
+            tegCount();
         }
-
-
-        for (String link : links) {
-            
-            i++;
-            String articleName = "article" + i + "Title";
-            String contentName = "article" + i;
-            String articleMetaTags = "article" + i + "MetaTag" + TMPL_EXT;
-            String articleHeader = "<h2 class=\"featurette-heading\">$!{file_articles_article" + i + "Title}</h2>";
+    }
+    
+    /**
+     * Creating teg file with tegs count
+     */
+    private void tegCount() {
+        try {
+            File out = new File(outputFolder + File.separator + "teg.txt");
+            for (Map.Entry pair : tegCount.entrySet()) {
+                FileUtils.writeStringToFile(out , pair.getKey() + " = " + pair.getValue() +"\n" , true);
+            }
+        } catch (IOException e) {
+            logger.error("method: tegCount()\n"
+                    + "Unable to create teg.txt file: " + e);
+        }
+    }
+    
+    /**
+     * Proccessing web page
+     * @param link
+     * @param id 
+     */
+    public void proccessWebPage(String link, String id) {
+        executor.execute(() -> {    
+            String articleName = "article" + id + "Title";
+            String contentName = "article" + id;
+            String articleMetaTags = "article" + id + "MetaTag" + TMPL_EXT;
+            String articleHeader = "<h2 class=\"featurette-heading\">$!{file_articles_article" + id + "Title}</h2>";
             String structure = "$!{file_structure_top}\n" +
-                                "  $!{file_articles_article" + i + "MetaTag}\n" +
+                                "  $!{file_articles_article" + id + "MetaTag}\n" +
                                 "   $!{file_structure_titleOpen}\n" +
-                                "       $!{file_articles_article" + i + "Title}\n" +
+                                "       $!{file_articles_article" + id + "Title}\n" +
                                 "   $!{file_structure_titleClose}\n" + 
                                 "  $!{file_structure_fulltop}\n" +
-                                "    $!{file_articles_article" + i + "}\n" +
-                                "  $!{file_pager_article" + i + "}\n" +
+                                "    $!{file_articles_article" + id + "}\n" +
+                                "  $!{file_pager_article" + id + "}\n" +
                                 "$!{file_structure_bottom}";
-            String articleBoxFile = "article" + i + "Box";
-            String articleImage = "articleImage" + i;
+            String articleBoxFile = "article" + id + "Box";
+            String articleImage = "articleImage" + id;
+
             File destination = new File(imagesFolder + File.separator + articleImage);
-            
-            executor.execute(() -> {
-                System.out.print("...");
-                try {
-                    Document doc = Jsoup.connect(link).timeout(5000).get();
-                    String title = doc.getElementsByTag("title").text().replaceAll(" - Лео творит!", "");
-                    Elements metaTags = doc.getElementsByAttributeValue("property", "article:tag");
-                    Element content = doc.getElementsByClass("entry-content").get(0);
-                    
+
+
+            System.out.print("...");
+            try {
+                Document doc = Jsoup.connect(link).timeout(5000).get();
+                String title = doc.getElementsByTag("title").text().replaceAll(" - Лео творит!", "");
+                Elements metaTags = doc.getElementsByAttributeValue("property", "article:tag");
+                Element content = doc.getElementsByClass("entry-content").get(0);
+                
+                if (this.tegEnable) {
                     for(Element el: metaTags) {
                         String teg = el.attr("content");
-                        if (map.containsKey(teg)) {
-                            map.replace(teg, map.get(teg)+1);
+                        if (tegCount.containsKey(teg)) {
+                            tegCount.replace(teg, tegCount.get(teg)+1);
                         } else {
-                            map.put(teg, 1);
+                            tegCount.put(teg, 1);
                         }
                     }
-                    
-                    content.getElementsByTag("div").remove();
-                    content.getElementsByAttributeValue("name", "cutid1").remove();
-                    content.getElementsByAttributeValue("name", "cutid1-end").remove();
-                    content.getElementsByAttributeValue("class", "i-ljuser-userhead").remove();
-                    content.getElementsByTag("img").attr("class", "img-responsive");
-                    content.select("img + br").remove();
-                    content.child(0).lastElementSibling().remove();
-                    
-                    String articleStructureName = translit(title) + PAGE_EXT;
-                    String articleBoxContent = "<a href=\"$!{root}/articles/"+ translit(title) +".html\">"
-                            + " <img class=\"img-responsive\" src=\"$!{root}/images/"+articleImage+"\"/></a>\n" +
-                            "<h2 class=\"box-title\"><a href=\"$!{root}/articles/"+translit(title)+".html\""
-                            + " rel=\"bookmark\">$!{file_articles_"+articleName+"}</a></h2>";
-                    Element keywords = new Element(Tag.valueOf("meta"), "").attr("name", "keywords")
-                            .attr("content", getEnglishWords(content.text()));
-                    URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
-                    proccessImage(imageUrl, destination);  
-                    
-                    try (PrintWriter out = new PrintWriter(articles + File.separator + articleMetaTags)) {
-                        out.println(metaTags);
-                        out.println(keywords);
-                    }
-                    try (PrintWriter out = new PrintWriter(articles + File.separator + articleName + TMPL_EXT)) {
-                        out.println(title);
-                    }
-                    try (PrintWriter out = new PrintWriter(articles + File.separator + contentName + TMPL_EXT)) {
-                        out.println(articleHeader);
-                        out.println(content.html());
-                    }
-                    try (PrintWriter out = new PrintWriter(articles + File.separator + articleStructureName)) {
-                        out.println(structure);
-                    }
-                    try (PrintWriter out = new PrintWriter(articleBox + File.separator + articleBoxFile + TMPL_EXT)) {
-                        out.println(articleBoxContent);
-                    }
-
-                } catch (IOException ex) {
-                    System.err.println("Error: " + ex);    
                 }
-            });   
+
+                content.getElementsByTag("div").remove();
+                content.getElementsByAttributeValue("name", "cutid1").remove();
+                content.getElementsByAttributeValue("name", "cutid1-end").remove();
+                content.getElementsByAttributeValue("class", "i-ljuser-userhead").remove();
+                content.getElementsByTag("img").attr("class", "img-responsive");
+                content.select("img + br").remove();
+                content.child(0).lastElementSibling().remove();
+
+                String articleStructureName = translit(title) + PAGE_EXT;
+
+                String articleBoxContent = "<a href=\"$!{root}/articles/"+ translit(title) +".html\">"
+                        + " <img class=\"img-responsive\" src=\"$!{root}/images/"+articleImage+"\"/></a>\n" +
+                        "<h2 class=\"box-title\"><a href=\"$!{root}/articles/"+translit(title)+".html\""
+                        + " rel=\"bookmark\">$!{file_articles_"+articleName+"}</a></h2>";
+
+                Element keywords = new Element(Tag.valueOf("meta"), "").attr("name", "keywords")
+                        .attr("content", getEnglishWords(content.text()));
+
+                URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
+                proccessImage(imageUrl, destination);  
+
+
+                writeFile(this.article + File.separator + articleMetaTags, metaTags + "\n" + keywords);
+                writeFile(this.article + File.separator + articleName + TMPL_EXT, title);
+                writeFile(this.article + File.separator + contentName + TMPL_EXT, articleHeader + "\n" + content.html());
+                writeFile(this.article + File.separator + articleStructureName, structure);
+                writeFile(this.articleBox + File.separator + articleBoxFile + TMPL_EXT, articleBoxContent);
+            } catch (IOException e) {
+                logger.error("method: proccessWebPage(String, String)\n"
+                    + "Error during connection or FileNotFoundException: " + e);
+            }  
+        });
+    }
+    
+    /**
+     * Write file
+     * @param directory
+     * @param content
+     * @throws FileNotFoundException 
+     */
+    public void writeFile(String directory, String content) throws FileNotFoundException {
+        try (PrintWriter out = new PrintWriter(directory)) {
+                    out.println(content);
+        } 
+    }
+    
+    /**
+     * Create folder
+     * @param folderName
+     * @return 
+     */
+    public final File createFolder(String folderName) {
+        
+        File folder = new File(outputFolder + File.separator + folderName);
+        if (!folder.exists()) {
+            if (!folder.mkdir()) {
+                System.err.println("Enable to create " + folderName + " folder");
+                logger.error("method: createFolder(String)\n"
+                    + "Enable to create " + folderName + " folder");
+            }
         }
-        shutdown();    
-        File out = new File(outputFolder + File.separator + "teg.txt");
-        for (Map.Entry pair : map.entrySet()) {
-            FileUtils.writeStringToFile(out , pair.getKey() + " = " + pair.getValue() +"\n" , true);
-        }
+        return folder;
     }
     
     /**
@@ -177,7 +229,8 @@ public class ProccessingData {
             a = width / WIDTH_PROPORTION;
             b = height / HEIGHT_PROPORTION;    
         } catch (ArithmeticException | IllegalArgumentException e) {
-            System.err.println("Error: " + e);
+            logger.error("method: getProportion(int, int)\n"
+                    + "ArithmeticException or IllegalArgumentException: " + e);
         }
         if (a < b) {
             return a;
@@ -195,17 +248,28 @@ public class ProccessingData {
         try {
             img = ImageIO.read(imageUrl);
         } catch (IOException e) {
-            System.err.println("Error read image: " + e);
+            logger.error("method: proccessImage(Url, File)\n"
+                    + "Error during image read: " + e);
         }
         int p = getProportion(img.getWidth(), img.getHeight());
        
         img = img.getSubimage(0, 0, p * WIDTH_PROPORTION, p * HEIGHT_PROPORTION);
-        
         try {
-            
-            ImageIO.write(img, "png", destination);
+            Iterator<ImageWriter> i = ImageIO.getImageWritersByFormatName("jpeg");
+            ImageWriter jpegWriter = i.next();
+            ImageWriteParam param = jpegWriter.getDefaultWriteParam();
+            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            param.setCompressionQuality(1.0f);
+            FileImageOutputStream out = new FileImageOutputStream(destination);
+            jpegWriter.setOutput(out);
+            jpegWriter.write(null, new IIOImage(img, null, null), param);
+            jpegWriter.dispose();
+            out.close();
+//            ImageIO.write(img, "png", destination);
         } catch (IOException e) {
              System.err.println("Error write image: " + e);
+             logger.error("method: proccessImage(Url, File)\n"
+                    + "Error during image proccess: " + e);
         }
     }
     
