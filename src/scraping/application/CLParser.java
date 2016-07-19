@@ -30,10 +30,12 @@ public class CLParser {
     private List<String> links = new ArrayList<>();
     private File outputFolder;
     private boolean enableTeg = false;
+    private boolean enableLinkGeneration = false;
     
     public CLParser(String[] args) throws ParseException, IOException {
         this.filesOption();
         this.tegOption();
+        this.linksOption();
         
         try {
             
@@ -43,6 +45,9 @@ public class CLParser {
             }
             if (commandLine.hasOption("t")) {
                 this.enableTeg = true;
+            }
+            if (commandLine.hasOption("l")) {
+                this.enableLinkGeneration = true;
             }
             
         } catch (ParseException ex) {
@@ -63,6 +68,10 @@ public class CLParser {
     
     private void tegOption() {
         options.addOption("t", false, "enable teg");
+    }
+    
+    private void linksOption() {
+        options.addOption("l", false, "enable links generation");
     }
     
     private void proccessFilesOption(CommandLine cl) throws FileNotFoundException, IOException {
@@ -90,5 +99,9 @@ public class CLParser {
     
     public File getOutputFolder() {
         return outputFolder;
+    }
+    
+    public boolean getLinkGen() {
+        return enableLinkGeneration;
     }
 }

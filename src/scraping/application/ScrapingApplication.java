@@ -24,11 +24,14 @@ public class ScrapingApplication {
      */
     public static void main(String[] args) throws FileNotFoundException, IOException, ParseException {
 
-//        String[] myArgs = {"-f", "links.txt", "site", "-t"};
+        String[] myArgs = {"-f", "links.txt", "site", "-t", "-l"};
         
-        CLParser parser = new CLParser(args);
+        CLParser parser = new CLParser(myArgs);
         ProccessingData obj = new ProccessingData(parser.getLinks(), parser.getOutputFolder(),
-                parser.enableTeg());
+                parser.enableTeg(), parser.getLinkGen());
         obj.proccessLinks();
+        
+        
+        
     }
 }

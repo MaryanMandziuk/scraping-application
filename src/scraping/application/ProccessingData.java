@@ -6,11 +6,15 @@
 package scraping.application;
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -57,18 +61,64 @@ public class ProccessingData {
      * @param links
      * @param outputFolder
      * @param tegEnable
+     * @param linkGeneration
      * @throws IOException 
      */
-    public ProccessingData(List<String> links, File outputFolder, boolean tegEnable) throws IOException {
-        this.links = links;
+    public ProccessingData(List<String> links, File outputFolder, boolean tegEnable, boolean linkGeneration) throws IOException {
         this.outputFolder = outputFolder;
         this.article = createFolder("articles");
         this.imagesFolder = createFolder("images");
         this.articleBox = createFolder("articleBox");
         this.tegEnable = tegEnable;
-        this.executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());   
+        this.executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()); 
+        
+        if (linkGeneration) {
+            this.links = this.generateLinks();
+        } else {
+            this.links = links;
+        }
     }
     
+    public List<String> generateLinks() throws IOException {
+        List<String> links = new ArrayList<>();
+        
+        Document doc = Jsoup.connect("http://leo-tvorit.livejournal.com/").timeout(5000).get();
+        List<String> blackList = Arrays.asList("Про Лео");
+        while (true) {
+            Elements subjLink = doc.getElementsByClass("subj-link");
+
+            Elements ljtags = doc.getElementsByClass("ljtags");
+
+            for (int i = 0; i < ljtags.size(); i++) {
+                Elements tegs = ljtags.get(i).getElementsByTag("a");
+                boolean check = false;
+
+                for (Element e : tegs) {
+                    if (blackList.contains(e.text())) {
+                        check = true;
+                    } else {
+                        check = false;
+                        break;
+                    }
+                }
+
+                if (!check) {
+                    links.add(subjLink.get(i).attr("href"));
+                }
+
+            }
+
+            Element nextPage = doc.getElementsByClass("prev").select("a").first();
+            try {
+                doc = Jsoup.connect(nextPage.attr("href")).timeout(5000).get();
+            } catch (Exception e) {
+                System.out.println("Finish!");
+                break; 
+            }
+        }
+        
+        return links;
+    }
     /**
      * Iterating links
      * @throws IOException 
@@ -109,6 +159,7 @@ public class ProccessingData {
      * @param id 
      */
     public void proccessWebPage(String link, String id) {
+        
         executor.execute(() -> {    
             String articleName = "article" + id + "Title";
             String contentName = "article" + id;
@@ -280,7 +331,7 @@ public class ProccessingData {
         executor.shutdown(); 
         try {
             executor.shutdown();
-            executor.awaitTermination(55, TimeUnit.SECONDS);
+            executor.awaitTermination(6000, TimeUnit.SECONDS);
         }
         catch (InterruptedException e) {
             System.err.println("tasks interrupted" + e);
