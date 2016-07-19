@@ -79,6 +79,11 @@ public class ProccessingData {
         }
     }
     
+    /**
+     * Scraping links
+     * @return
+     * @throws IOException 
+     */
     public List<String> generateLinks() throws IOException {
         List<String> links = new ArrayList<>();
         
