@@ -26,7 +26,7 @@ public class ScrapingApplication {
 
 //        String[] myArgs = {"-f", "links.txt", "site", "-t", "-l"};
         
-        CLParser parser = new CLParser(args);
+        CLParser parser = new CLParser(args );
         ProccessingData obj = new ProccessingData(parser.getLinks(), parser.getOutputFolder(),
                 parser.enableTeg(), parser.getLinkGen());
         obj.proccessLinks();

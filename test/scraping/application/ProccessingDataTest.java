@@ -56,12 +56,8 @@ public class ProccessingDataTest {
         assertThat(FileUtils.listFiles(resultFolder, null, true), hasItems(articleImage1,
                 article1Box, article1, page, article1Title, article1MetaTag, teg));
         
-        BufferedImage img = null;
-        try {
-            img = ImageIO.read(articleImage1);
-        } catch (IOException e) {
-            System.err.println("Error read image: " + e);
-        }
+        BufferedImage img = ImageIO.read(articleImage1);
+        
         assertEquals("failure - image hasn't proportion", img.getWidth() / 9, img.getHeight() / 7);
         
         String expected_article1Box = "<a href=\"$!{root}/articles/Khud-shopping-bumaga-dlya-akvareli.html\">"
