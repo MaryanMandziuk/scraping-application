@@ -56,6 +56,7 @@ public class ProccessingData {
     private final File outputFolder;
     private final boolean tegEnable;
     private final Logger logger = LoggerFactory.getLogger(ProccessingData.class);
+    private Map<String, String> articleTag = new HashMap<>();
     /**
      * Constructor which is gets, cleans web data
      * @param links
@@ -71,7 +72,7 @@ public class ProccessingData {
         this.articleBox = createFolder("articleBox");
         this.tegEnable = tegEnable;
         this.executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()); 
-        
+        this.tegCount.put("index", 0);
         if (linkGeneration) {
             this.links = this.generateLinks();
         } else {
@@ -192,16 +193,7 @@ public class ProccessingData {
                 Elements metaTags = doc.getElementsByAttributeValue("property", "article:tag");
                 Element content = doc.getElementsByClass("entry-content").get(0);
                 
-                if (this.tegEnable) {
-                    for(Element el: metaTags) {
-                        String teg = el.attr("content");
-                        if (tegCount.containsKey(teg)) {
-                            tegCount.replace(teg, tegCount.get(teg)+1);
-                        } else {
-                            tegCount.put(teg, 1);
-                        }
-                    }
-                }
+                
 
                 content.getElementsByTag("div").remove();
                 content.getElementsByAttributeValue("name", "cutid1").remove();
@@ -213,11 +205,28 @@ public class ProccessingData {
 
                 String articleStructureName = translit(title) + PAGE_EXT;
 
-                String articleBoxContent = "<a href=\"$!{root}/articles/"+ translit(title) +".html\">"
-                        + " <img class=\"img-responsive\" src=\"$!{root}/images/"+articleImage+"\"/></a>\n" +
-                        "<h2 class=\"box-title\"><a href=\"$!{root}/articles/"+translit(title)+".html\""
-                        + " rel=\"bookmark\">$!{file_articles_"+articleName+"}</a></h2>";
-
+                String articleBoxContent = "<article id=\"post-83\" class=\"col-md-4 col-sm-4 pbox post-83 post type-post status-publish format-standard has-post-thumbnail hentry category-featured category-tutorials\">"
+                        + "<a href=\"$!{root}/articles/" + translit(title) + ".html\">"
+                        + " <img class=\"img-responsive\" src=\"$!{root}/images/" + articleImage + "\"/></a>\n"
+                        + "<h2 class=\"box-title\"><a href=\"$!{root}/articles/" + translit(title) + ".html\""
+                        + " rel=\"bookmark\">$!{file_articles_" + articleName + "}</a></h2>"
+                        + "    </article>";
+                
+                
+                StringBuilder b = new StringBuilder();
+                for (Element el : metaTags) {
+                    String teg = el.attr("content");
+                    b.append(teg + " ");
+                    if (tegCount.containsKey(teg)) {
+                        tegCount.replace(teg, tegCount.get(teg) + 1);
+                    } else if (teg != "") {
+                        tegCount.put(teg, 1);
+                    }
+                }
+                tegCount.replace("index", tegCount.get("index") + 1);
+                articleTag.put(articleBoxContent, b.toString());
+                
+                
                 Element keywords = new Element(Tag.valueOf("meta"), "").attr("name", "keywords")
                         .attr("content", getEnglishWords(content.text()));
 
@@ -236,6 +245,7 @@ public class ProccessingData {
             }  
         });
     }
+    
     
     /**
      * Write file
@@ -438,4 +448,160 @@ public class ProccessingData {
         }
         return false;
     }
+    
+    
+    public String[] generateBoxes(String tag, int numberRows, int numberBoxInRow) {
+        StringBuilder tmp = new StringBuilder("<div class=\"row\">");
+        String[] result = new String[articleTag.size() / (numberRows * numberBoxInRow)];
+        int countBoxRow = 0;
+        int countBoxPage = 0;
+        int i = 0;
+        if (tag == "index") {
+            for (String box: this.articleTag.keySet()) {
+                tmp.append(box + "\n");
+                countBoxRow++;
+                countBoxPage++;
+                if (countBoxRow == numberBoxInRow) {
+                    tmp.append("</div>\n" 
+                    + "<div class =\"row\">\n");
+                }
+                if (countBoxPage == numberRows * numberBoxInRow || articleTag.size() == i) {
+                    tmp.append("</div>\n");
+                    result[i] = tmp.toString();
+                    i++;
+                    tmp = new StringBuilder("<div class=\"row\">");
+                }
+            }
+            
+        } else {
+            for (String box: this.articleTag.keySet()) {
+                if (articleTag.get(box).contains(tag)) {
+                    tmp.append(box + "\n");
+                    countBoxRow++;
+                    countBoxPage++;
+                    if (countBoxRow == numberBoxInRow) {
+                        tmp.append("</div>\n" 
+                        + "<div class =\"row\">\n");
+                    }
+                    if (countBoxPage == numberRows * numberBoxInRow || articleTag.size() == i) {
+                        tmp.append("</div>\n");
+                        result[i] = tmp.toString();
+                        i++;
+                        tmp = new StringBuilder("<div class=\"row\">");
+                    }
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    public String generateLinksWithTags(String tag) {
+        StringBuilder tmp = new StringBuilder("<div class=\"col-xs-10 col-sm-3 sidebar-offcanvas\" id=\"sidebar\">\n" +
+                        "	<ul class=\"nav nav-pills nav-stacked\">\n");
+        String nameIndex ="";
+        for (String t : tegCount.keySet()) {
+            nameIndex = translit(t);
+            if (t != tag) {
+                tmp.append("  <li role=\"presentation\">\n" +
+                "  <a href=\"/index.html\""
+                + " rel=\"category tag\">" + t + "<span class=\"badge\">"
+                + tegCount.get(t)+"</span></a>\n" +
+                "  </li>\n");
+            } else {
+                tmp.append("  <span  class=\"dis\">\n" +
+                "  <a href=\"/index-" + nameIndex + ".html\""
+                + " rel=\"category tag\">" + t + "<span class=\"badge\">"
+                + tegCount.get(t)+"</span></a>\n" +
+                "  </span>\n");
+            }            
+        }
+        tmp.append("</ul>\n</div>\n");    
+        return tmp.toString();
+    }
+    
+    public String generatePagination(int len) {
+        StringBuilder tmp = new StringBuilder();
+        
+        return "";
+    }
+    public void generateIndexPages() {
+        String top = "<!DOCTYPE html>\n" +
+                "<html lang=\"en-US\">\n" +
+                "<head>\n" +
+                "<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/bootstrap.min.css\">\n" +
+                "<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/topography.css\">\n" +
+                "<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/style.css\" media=\"all\">\n" +
+                "<meta charset=\"UTF-8\">\n" +
+                "<meta name=\"viewport\" content=\"width=device-width\">\n" +
+                "<title>Articles</title>\n" +
+                "\n" +
+                "		</head>\n" +
+                "\n" +
+                "<body class=\"home blog\">\n" +
+                "\n" +
+                "    <div class=\"site-overlay\"></div>\n" +
+                "<div id=\"page\" class=\"hfeed site  \">\n" +
+                "	<div class=\"container\">\n" +
+                "	<div id=\"content\" class=\"site-content row\">\n" +
+                "	<div class=\"col-md-12 intro-me clearfix topography\">\n" +
+                "		<h1>Articles</h1>\n" +
+                "		<p>Articles Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit </p>\n" +
+                "	</div>\n" +
+                "\n" +
+                "\n" +
+                "	<div id=\"primary\" class=\"content-area \">\n" +
+                "		<main id=\"main\" class=\"site-main\" role=\"main\">\n" +
+                "\n" +
+                "			<div class=\"row\">\n" +
+                "				<div class=\"col-xs-12 col-sm-9\">\n" +
+                "					<div class=\"row\">";
+        String mid = "  </div>\n" +
+                "</div>";
+        String bottom = "</div>\n" +
+                "</main><!-- #main -->\n" +
+                "</div><!-- #primary -->\n" +
+                "\n" +
+                "\n" +
+                "\n" +
+                "</div><!-- #content -->\n" +
+                "\n" +
+                "<div class=\"row\">\n" +
+                "<footer id=\"colophon\" class=\"site-footer col-md-12\" role=\"contentinfo\">\n" +
+                "  <div class=\"site-info\">\n" +
+                "    <div class=\"fcred col-12\">\n" +
+                "      Copyright &copy; 2016 <a href=\"http://demo.fabthemes.com/wembley\">Articles</a> - Just another demo Sites site.<br />\n" +
+                "    </div>\n" +
+                "  </div><!-- .site-info -->\n" +
+                "</footer><!-- #colophon -->\n" +
+                "</div>\n" +
+                "</div>\n" +
+                "</div><!-- #page -->\n" +
+                "\n" +
+                "<style type=\"text/css\">\n" +
+                "\n" +
+                "  .pushy,.menu-btn{ background: ; }\n" +
+                "  a,a:visited{ color:;}\n" +
+                "  a:hover,a:focus,a:active { color:; }\n" +
+                "\n" +
+                "</style>\n" +
+                "\n" +
+                "</body>\n" +
+                "</html>";
+        final int numberRows = 4;
+        final int numberBoxInRow = 3;
+        for (String tag: tegCount.keySet()) {
+            String[] boxBody = generateBoxes(tag, numberRows, numberBoxInRow);
+            for (int i = 0; i < boxBody.length; i++) {
+                StringBuilder page = new StringBuilder();
+                page.append(top +"\n");
+                page.append(boxBody[i]+"\n");
+                page.append(mid+"\n");
+                page.append(generateLinksWithTags(tag) + "\n");
+                page.append(bottom);
+            }
+        } 
+    }
+       
+    
 }
