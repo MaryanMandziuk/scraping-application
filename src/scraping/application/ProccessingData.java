@@ -15,10 +15,12 @@ import java.io.PrintWriter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jsoup.Jsoup;
@@ -51,28 +53,30 @@ public class ProccessingData {
     private final File article;
     private final File imagesFolder;
     private final File articleBox;
-    private Map<String, Integer> tegCount = new HashMap<>();
+    private Map<String, Integer> tagCount = new HashMap<>();
     private final List<String> links;
     private final File outputFolder;
-    private final boolean tegEnable;
+//    private final boolean tagEnable;
     private final Logger logger = LoggerFactory.getLogger(ProccessingData.class);
     private Map<String, String> articleTag = new HashMap<>();
+    private Map<Integer, String> articlePage = new HashMap<>();
+    private final String indexName = "Всі мітки";
     /**
      * Constructor which is gets, cleans web data
      * @param links
      * @param outputFolder
-     * @param tegEnable
+     * @param tagEnable
      * @param linkGeneration
      * @throws IOException 
      */
-    public ProccessingData(List<String> links, File outputFolder, boolean tegEnable, boolean linkGeneration) throws IOException {
+    public ProccessingData(List<String> links, File outputFolder, boolean linkGeneration) throws IOException {
         this.outputFolder = outputFolder;
         this.article = createFolder("articles");
         this.imagesFolder = createFolder("images");
         this.articleBox = createFolder("articleBox");
-        this.tegEnable = tegEnable;
+//        this.tagEnable = tagEnable;
         this.executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()); 
-        this.tegCount.put("index", 0);
+        this.tagCount.put(indexName, 0);
         if (linkGeneration) {
             this.links = this.generateLinks();
         } else {
@@ -96,10 +100,10 @@ public class ProccessingData {
             Elements ljtags = doc.getElementsByClass("ljtags");
 
             for (int i = 0; i < ljtags.size(); i++) {
-                Elements tegs = ljtags.get(i).getElementsByTag("a");
+                Elements tags = ljtags.get(i).getElementsByTag("a");
                 boolean check = false;
 
-                for (Element e : tegs) {
+                for (Element e : tags) {
                     if (blackList.contains(e.text())) {
                         check = true;
                     } else {
@@ -139,23 +143,28 @@ public class ProccessingData {
         
         shutdown();
         
-        if (this.tegEnable) {
-            tegCount();
+//        if (this.tagEnable) {
+            tagCount();
+//        }
+        generateIndexPages();
+        if (articleTag.size() > 1) {
+            generatePager();
         }
+        createNomirrors();
     }
     
     /**
-     * Creating teg file with tegs count
+     * Creating tag file with tags count
      */
-    private void tegCount() {
+    private void tagCount() {
         try {
-            File out = new File(outputFolder + File.separator + "teg.txt");
-            for (Map.Entry pair : tegCount.entrySet()) {
+            File out = new File(outputFolder + File.separator + "tag.txt");
+            for (Map.Entry pair : tagCount.entrySet()) {
                 FileUtils.writeStringToFile(out , pair.getKey() + " = " + pair.getValue() +"\n" , true);
             }
         } catch (IOException e) {
-            logger.error("method: tegCount()\n"
-                    + "Unable to create teg.txt file: " + e);
+            logger.error("method: tagCount()\n"
+                    + "Unable to create tag.txt file: " + e);
         }
     }
     
@@ -192,7 +201,7 @@ public class ProccessingData {
                 String title = doc.getElementsByTag("title").text().replaceAll(" - Лео творит!", "");
                 Elements metaTags = doc.getElementsByAttributeValue("property", "article:tag");
                 Element content = doc.getElementsByClass("entry-content").get(0);
-                
+               
                 
 
                 content.getElementsByTag("div").remove();
@@ -202,7 +211,13 @@ public class ProccessingData {
                 content.getElementsByTag("img").attr("class", "img-responsive");
                 content.select("img + br").remove();
                 content.child(0).lastElementSibling().remove();
-
+                
+                try {
+                    URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
+                    proccessImage(imageUrl, destination); 
+                } catch (IndexOutOfBoundsException e) {
+                    return;
+                }
                 String articleStructureName = translit(title) + PAGE_EXT;
 
                 String articleBoxContent = "<article id=\"post-83\" class=\"col-md-4 col-sm-4 pbox post-83 post type-post status-publish format-standard has-post-thumbnail hentry category-featured category-tutorials\">"
@@ -215,24 +230,20 @@ public class ProccessingData {
                 
                 StringBuilder b = new StringBuilder();
                 for (Element el : metaTags) {
-                    String teg = el.attr("content");
-                    b.append(teg + " ");
-                    if (tegCount.containsKey(teg)) {
-                        tegCount.replace(teg, tegCount.get(teg) + 1);
-                    } else if (teg != "") {
-                        tegCount.put(teg, 1);
+                    String tag = el.attr("content");
+                    b.append(tag + " ");
+                    if (tagCount.containsKey(tag)) {
+                        tagCount.replace(tag, tagCount.get(tag) + 1);
+                    } else if (tag != "") {
+                        tagCount.put(tag, 1);
                     }
                 }
-                tegCount.replace("index", tegCount.get("index") + 1);
+                tagCount.replace(indexName, tagCount.get(indexName) + 1);
                 articleTag.put(articleBoxContent, b.toString());
-                
+                articlePage.put(Integer.parseInt(id), translit(title));
                 
                 Element keywords = new Element(Tag.valueOf("meta"), "").attr("name", "keywords")
                         .attr("content", getEnglishWords(content.text()));
-
-                URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
-                proccessImage(imageUrl, destination);  
-
 
                 writeFile(this.article + File.separator + articleMetaTags, metaTags + "\n" + keywords);
                 writeFile(this.article + File.separator + articleName + TMPL_EXT, title);
@@ -449,46 +460,73 @@ public class ProccessingData {
         return false;
     }
     
-    
+    /**
+     * 
+     * @param tag
+     * @param numberRows
+     * @param numberBoxInRow
+     * @return 
+     */
     public String[] generateBoxes(String tag, int numberRows, int numberBoxInRow) {
         StringBuilder tmp = new StringBuilder("<div class=\"row\">");
-        String[] result = new String[articleTag.size() / (numberRows * numberBoxInRow)];
+        int len=0;
+        if (tagCount.get(tag) < (numberRows * numberBoxInRow)) {
+            len = 1;
+        } else {
+            int c  = tagCount.get(tag) / (numberRows * numberBoxInRow);
+            if ((numberRows * numberBoxInRow) * c < tagCount.get(tag)) {
+                len = c+1 ;
+            } else {
+                len = c;
+            }
+        }
+        String[] result = new String[len];
         int countBoxRow = 0;
         int countBoxPage = 0;
         int i = 0;
-        if (tag == "index") {
+        int j = 0;
+        if (indexName.equals(tag)) {
             for (String box: this.articleTag.keySet()) {
                 tmp.append(box + "\n");
                 countBoxRow++;
                 countBoxPage++;
+                if (countBoxPage == numberRows * numberBoxInRow || tagCount.get(tag) == j+1) {
+                    tmp.append("</div>\n");
+                    result[i] = tmp.toString();
+                    i++; j++;
+                    tmp = new StringBuilder("<div class=\"row\">");
+                    countBoxRow = 0;
+                    continue;
+                }
                 if (countBoxRow == numberBoxInRow) {
                     tmp.append("</div>\n" 
                     + "<div class =\"row\">\n");
+                    countBoxRow = 0;
                 }
-                if (countBoxPage == numberRows * numberBoxInRow || articleTag.size() == i) {
-                    tmp.append("</div>\n");
-                    result[i] = tmp.toString();
-                    i++;
-                    tmp = new StringBuilder("<div class=\"row\">");
-                }
+                j++;
             }
             
         } else {
+            j=0;
             for (String box: this.articleTag.keySet()) {
                 if (articleTag.get(box).contains(tag)) {
                     tmp.append(box + "\n");
                     countBoxRow++;
                     countBoxPage++;
+                    if (countBoxPage == numberRows * numberBoxInRow || tagCount.get(tag) == j+1) {
+                        tmp.append("</div>\n");
+                        result[i] = tmp.toString();
+                        i++; j++;
+                        tmp = new StringBuilder("<div class=\"row\">");
+                        countBoxRow = 0;
+                        continue;
+                    }
                     if (countBoxRow == numberBoxInRow) {
                         tmp.append("</div>\n" 
                         + "<div class =\"row\">\n");
+                        countBoxRow = 0;
                     }
-                    if (countBoxPage == numberRows * numberBoxInRow || articleTag.size() == i) {
-                        tmp.append("</div>\n");
-                        result[i] = tmp.toString();
-                        i++;
-                        tmp = new StringBuilder("<div class=\"row\">");
-                    }
+                    j++;
                 }
             }
         }
@@ -496,23 +534,36 @@ public class ProccessingData {
         return result;
     }
     
+    /**
+     * 
+     * @param tag
+     * @return 
+     */
     public String generateLinksWithTags(String tag) {
         StringBuilder tmp = new StringBuilder("<div class=\"col-xs-10 col-sm-3 sidebar-offcanvas\" id=\"sidebar\">\n" +
                         "	<ul class=\"nav nav-pills nav-stacked\">\n");
         String nameIndex ="";
-        for (String t : tegCount.keySet()) {
+        tmp.append("  <li role=\"presentation\">\n" +
+                "  <a href=\"/index-" + translit(indexName) + "1.html\""
+                + " rel=\"category tag\">" + indexName + "<span class=\"badge\">"
+                + tagCount.get(indexName)+"</span></a>\n" +
+                "  </li>\n");
+        for (String t : tagCount.keySet()) {
+            if (t == indexName) {
+                continue;
+            }
             nameIndex = translit(t);
             if (t != tag) {
                 tmp.append("  <li role=\"presentation\">\n" +
-                "  <a href=\"/index.html\""
+                "  <a href=\"/index-" + nameIndex + "1.html\""
                 + " rel=\"category tag\">" + t + "<span class=\"badge\">"
-                + tegCount.get(t)+"</span></a>\n" +
+                + tagCount.get(t)+"</span></a>\n" +
                 "  </li>\n");
             } else {
                 tmp.append("  <span  class=\"dis\">\n" +
-                "  <a href=\"/index-" + nameIndex + ".html\""
+                "  <a href=\"/index-" + nameIndex + "1.html\""
                 + " rel=\"category tag\">" + t + "<span class=\"badge\">"
-                + tegCount.get(t)+"</span></a>\n" +
+                + tagCount.get(t)+"</span></a>\n" +
                 "  </span>\n");
             }            
         }
@@ -520,12 +571,38 @@ public class ProccessingData {
         return tmp.toString();
     }
     
-    public String generatePagination(int len) {
-        StringBuilder tmp = new StringBuilder();
-        
-        return "";
+    /**
+     * 
+     * @param len
+     * @param current
+     * @param indexName
+     * @return 
+     */
+    public String generatePagination(int len, int current, String indexName) {
+        StringBuilder tmp = new StringBuilder(" <div class=\"clearfix\"></div>\n" +
+            "				<div class=\"col-md-12\">\n" +
+            "				<div class='fab-paginate paginate'>\n" +
+            "					<ul class='pagination'>\n" +
+            "\n");
+        for (int i = 1; i <= len; i ++) {
+            if (i == current) {
+                tmp.append("<li class='active'><span class='current'>" + current + "</span></li>\n");
+            } else {
+                tmp.append("<li><a href='/index-" + indexName + i + ".html' class='inactive' >"+ i +"</a></li>\n");
+            }
+        }
+        tmp.append(
+            "      </ul>\n" +
+            "  </div>\n" +
+            "</div>");
+        return tmp.toString();
     }
-    public void generateIndexPages() {
+    
+    /**
+     * 
+     * @throws FileNotFoundException 
+     */
+    public void generateIndexPages() throws FileNotFoundException {
         String top = "<!DOCTYPE html>\n" +
                 "<html lang=\"en-US\">\n" +
                 "<head>\n" +
@@ -590,18 +667,65 @@ public class ProccessingData {
                 "</html>";
         final int numberRows = 4;
         final int numberBoxInRow = 3;
-        for (String tag: tegCount.keySet()) {
+        String nameIndex ="";
+        for (String tag: tagCount.keySet()) {
             String[] boxBody = generateBoxes(tag, numberRows, numberBoxInRow);
             for (int i = 0; i < boxBody.length; i++) {
                 StringBuilder page = new StringBuilder();
+                nameIndex = translit(tag);
                 page.append(top +"\n");
                 page.append(boxBody[i]+"\n");
+                if (boxBody.length > 1) {
+                    
+                    page.append(generatePagination(boxBody.length, i + 1, nameIndex));
+                }
                 page.append(mid+"\n");
                 page.append(generateLinksWithTags(tag) + "\n");
                 page.append(bottom);
+                int tmp =  i + 1;
+                writeFile(this.outputFolder + File.separator + "index-" + nameIndex + tmp + this.PAGE_EXT, page.toString());
             }
         } 
     }
-       
+    
+    /**
+     * 
+     * @throws FileNotFoundException 
+     */
+    public void generatePager() throws FileNotFoundException, IOException {
+        String tmpl = "";
+        File folderPager = createFolder("pager");
+        new File(folderPager + File.separator + ".nomirror").createNewFile();
+        for(Integer i : articlePage.keySet()) {
+            if (i == 1) {
+                tmpl = "<nav>\n" +
+                "  <ul class=\"pager\">\n" +
+                "    <li class=\"previous disabled\"><a href=\"#\"><span aria-hidden=\"true\">&larr;</span> Previous</a></li>\n" +
+                "    <li class=\"next\"><a href=\"$!{root}/articles/" + articlePage.get(i+1) +  ".html\">Next <span aria-hidden=\"true\">&rarr;</span></a></li>\n" +
+                "  </ul>\n" +
+                "</nav>";
+            } else if (i == articlePage.size()) {
+                tmpl = "<nav>\n" +
+                    "  <ul class=\"pager\">\n" +
+                    "    <li class=\"previous\"><a href=\"$!{root}/articles/" + articlePage.get(i-1) + ".html\"><span aria-hidden=\"true\">&larr;</span> Previous</a></li>\n" +
+                    "    <li class=\"next disabled\"><a href=\"#\">Next <span aria-hidden=\"true\">&rarr;</span></a></li>\n" +
+                    "  </ul>\n" +
+                    "</nav>";
+            } else {
+                tmpl = "<nav>\n" +
+                "  <ul class=\"pager\">\n" +
+                "    <li class=\"previous\"><a href=\"$!{root}/articles/" + articlePage.get(i-1) + ".html\"><span aria-hidden=\"true\">&larr;</span> Previous</a></li>\n" +
+                "    <li class=\"next\"><a href=\"$!{root}/articles/" + articlePage.get(i+1) + ".html\">Next <span aria-hidden=\"true\">&rarr;</span></a></li>\n" +
+                "  </ul>\n" +
+                "</nav>";
+            }
+            writeFile(folderPager + File.separator + "article" + (i) + TMPL_EXT, tmpl);
+        }
+        
+    }
+    
+    public void createNomirrors() throws IOException {
+        new File(this.articleBox + File.separator + ".nomirror").createNewFile();
+    }
     
 }

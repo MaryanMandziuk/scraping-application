@@ -29,23 +29,26 @@ public class CLParser {
     private Options options = new Options();
     private List<String> links = new ArrayList<>();
     private File outputFolder;
-    private boolean enableTeg = false;
+//    private boolean enableTag = false;
     private boolean enableLinkGeneration = false;
     
     public CLParser(String[] args) throws ParseException, IOException {
         this.filesOption();
-        this.tegOption();
+//        this.tagOption();
         this.linksOption();
-        
+        this.outputFolderOption();
         try {
             
             CommandLine commandLine = parser.parse(options, args);
             if (commandLine.hasOption("f")) {
-                this.proccessFilesOption(commandLine);
+                this.proccessOutputFolderOption(commandLine);
             }
-            if (commandLine.hasOption("t")) {
-                this.enableTeg = true;
+            if (commandLine.hasOption("i")) {
+                this.proccessFileLinkOption(commandLine);
             }
+//            if (commandLine.hasOption("t")) {
+//                this.enableTag = true;
+//            }
             if (commandLine.hasOption("l")) {
                 this.enableLinkGeneration = true;
             }
@@ -58,30 +61,40 @@ public class CLParser {
     }
     
     private void filesOption() {
-        options.addOption(Option.builder("f")
-                .numberOfArgs(2)
-                .argName("in-file output folder")
-                .required()
-                .desc("required two value")
+        options.addOption(Option.builder("i")
+                .numberOfArgs(1)
+                .argName("in-file")
+                .desc("required one value")
                 .build());
     }
     
-    private void tegOption() {
-        options.addOption("t", false, "enable teg");
+    private void outputFolderOption() {
+        options.addOption(Option.builder("f")
+                .numberOfArgs(1)
+                .argName("in-file")
+                .required()
+                .desc("required one value")
+                .build());
     }
+     
+//    private void tagOption() {
+//        options.addOption("t", false, "enable tag");
+//    }
     
     private void linksOption() {
         options.addOption("l", false, "enable links generation");
     }
     
-    private void proccessFilesOption(CommandLine cl) throws FileNotFoundException, IOException {
-        File resources = new File(cl.getOptionValues("f")[0]);
-        outputFolder = new File(cl.getOptionValues("f")[1]);
+    private void proccessOutputFolderOption(CommandLine cl) throws FileNotFoundException, IOException {
+        outputFolder = new File(cl.getOptionValue("f"));
 
         if (!outputFolder.isDirectory()) {
             outputFolder.mkdir();
         }
-
+    }
+    
+    private void proccessFileLinkOption(CommandLine cl) throws FileNotFoundException, IOException {
+        File resources = new File(cl.getOptionValue("i"));
         BufferedReader read = new BufferedReader(new FileReader(resources));
 
         for (String link; (link = read.readLine()) != null;) {
@@ -89,9 +102,9 @@ public class CLParser {
         }
     }
     
-    public boolean enableTeg() {
-        return this.enableTeg;
-    }
+//    public boolean enableTag() {
+//        return this.enableTag;
+//    }
     
     public List getLinks() {
         return this.links;
