@@ -150,7 +150,7 @@ public class ProccessingData {
         if (articleTag.size() > 1) {
             generatePager();
         }
-        createNomirrors();
+        createNomirrors(this.articleBox);
     }
     
     /**
@@ -190,7 +190,7 @@ public class ProccessingData {
                                 "  $!{file_pager_article" + id + "}\n" +
                                 "$!{file_structure_bottom}";
             String articleBoxFile = "article" + id + "Box";
-            String articleImage = "articleImage" + id;
+            String articleImage = "articleImage" + id + ".jpeg";
 
             File destination = new File(imagesFolder + File.separator + articleImage);
 
@@ -331,13 +331,14 @@ public class ProccessingData {
         int p = getProportion(img.getWidth(), img.getHeight());
        
         img = img.getSubimage(0, 0, p * WIDTH_PROPORTION, p * HEIGHT_PROPORTION);
+       
         try {
             Iterator<ImageWriter> i = ImageIO.getImageWritersByFormatName("jpeg");
             ImageWriter jpegWriter = i.next();
             ImageWriteParam param = jpegWriter.getDefaultWriteParam();
             param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
             param.setCompressionQuality(1.0f);
-            FileImageOutputStream out = new FileImageOutputStream(destination);
+            FileImageOutputStream out = new FileImageOutputStream(destination );
             jpegWriter.setOutput(out);
             jpegWriter.write(null, new IIOImage(img, null, null), param);
             jpegWriter.dispose();
@@ -724,8 +725,13 @@ public class ProccessingData {
         
     }
     
-    public void createNomirrors() throws IOException {
-        new File(this.articleBox + File.separator + ".nomirror").createNewFile();
+    /**
+     * Create nomirror file 
+     * @param destenation
+     * @throws IOException 
+     */
+    public void createNomirrors(File destenation) throws IOException {
+        new File(destenation + File.separator + ".nomirror").createNewFile();
     }
     
 }
