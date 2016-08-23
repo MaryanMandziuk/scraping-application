@@ -197,7 +197,7 @@ public class ProccessingData {
 
             System.out.print("...");
             try {
-                Document doc = Jsoup.connect(link).timeout(5000).get();
+                Document doc = Jsoup.connect(link).timeout(9000).get();
                 String title = doc.getElementsByTag("title").text().replaceAll(" - Лео творит!", "");
                 Elements metaTags = doc.getElementsByAttributeValue("property", "article:tag");
                 Element content = doc.getElementsByClass("entry-content").get(0);
@@ -209,12 +209,13 @@ public class ProccessingData {
                 content.getElementsByAttributeValue("name", "cutid1-end").remove();
                 content.getElementsByAttributeValue("class", "i-ljuser-userhead").remove();
                 content.getElementsByTag("img").attr("class", "img-responsive");
+                content.getElementsByAttributeValue("lj:user", "ssoland").remove();
                 content.select("img + br").remove();
                 content.child(0).lastElementSibling().remove();
                 
                 try {
                     URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
-                    proccessImage(imageUrl, destination); 
+                    proccessImage(imageUrl, destination, link); 
                 } catch (IndexOutOfBoundsException e) {
                     return;
                 }
@@ -320,13 +321,14 @@ public class ProccessingData {
      * @param imageUrl
      * @param destination 
      */
-    private void proccessImage(URL imageUrl, File destination) {
+    private void proccessImage(URL imageUrl, File destination, String link) {
         BufferedImage img = null;
         try {
             img = ImageIO.read(imageUrl);
         } catch (IOException e) {
             logger.error("method: proccessImage(Url, File)\n"
                     + "Error during image read: " + e);
+            System.out.println("imageUrl=" + imageUrl);
         }
         int p = getProportion(img.getWidth(), img.getHeight());
        
@@ -348,6 +350,7 @@ public class ProccessingData {
              System.err.println("Error write image: " + e);
              logger.error("method: proccessImage(Url, File)\n"
                     + "Error during image proccess: " + e);
+             System.out.println("imageUrl=" + link);
         }
     }
     
