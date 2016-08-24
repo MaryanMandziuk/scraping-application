@@ -82,6 +82,7 @@ public class ProccessingData {
         } else {
             this.links = links;
         }
+        System.out.println("len="+this.links.size());
     }
     
     /**
@@ -94,7 +95,9 @@ public class ProccessingData {
         
         Document doc = Jsoup.connect("http://leo-tvorit.livejournal.com/").timeout(5000).get();
         List<String> blackList = Arrays.asList("Про Лео");
+//        int c = 0;
         while (true) {
+//            c++;
             Elements subjLink = doc.getElementsByClass("subj-link");
 
             Elements ljtags = doc.getElementsByClass("ljtags");
@@ -104,11 +107,12 @@ public class ProccessingData {
                 boolean check = false;
 
                 for (Element e : tags) {
+                    String t = e.text();
                     if (blackList.contains(e.text())) {
                         check = true;
+                        break;
                     } else {
                         check = false;
-                        break;
                     }
                 }
 
@@ -215,7 +219,7 @@ public class ProccessingData {
                 
                 try {
                     URL imageUrl = new URL(content.getElementsByTag("img").get(0).attr("abs:src"));
-                    proccessImage(imageUrl, destination, link); 
+                    proccessImage(imageUrl, destination); 
                 } catch (IndexOutOfBoundsException e) {
                     return;
                 }
@@ -321,14 +325,13 @@ public class ProccessingData {
      * @param imageUrl
      * @param destination 
      */
-    private void proccessImage(URL imageUrl, File destination, String link) {
+    private void proccessImage(URL imageUrl, File destination) {
         BufferedImage img = null;
         try {
             img = ImageIO.read(imageUrl);
         } catch (IOException e) {
             logger.error("method: proccessImage(Url, File)\n"
                     + "Error during image read: " + e);
-            System.out.println("imageUrl=" + imageUrl);
         }
         int p = getProportion(img.getWidth(), img.getHeight());
        
@@ -350,7 +353,6 @@ public class ProccessingData {
              System.err.println("Error write image: " + e);
              logger.error("method: proccessImage(Url, File)\n"
                     + "Error during image proccess: " + e);
-             System.out.println("imageUrl=" + link);
         }
     }
     
@@ -494,7 +496,7 @@ public class ProccessingData {
                 tmp.append(box + "\n");
                 countBoxRow++;
                 countBoxPage++;
-                if (countBoxPage == numberRows * numberBoxInRow || tagCount.get(tag) == j+1) {
+                if ((countBoxPage / (i + 1) ) == numberRows * numberBoxInRow || tagCount.get(tag) == j+1) {
                     tmp.append("</div>\n");
                     result[i] = tmp.toString();
                     i++; j++;
@@ -517,7 +519,7 @@ public class ProccessingData {
                     tmp.append(box + "\n");
                     countBoxRow++;
                     countBoxPage++;
-                    if (countBoxPage == numberRows * numberBoxInRow || tagCount.get(tag) == j+1) {
+                    if ((countBoxPage / (i + 1) ) == numberRows * numberBoxInRow || tagCount.get(tag) == j+1) {
                         tmp.append("</div>\n");
                         result[i] = tmp.toString();
                         i++; j++;
