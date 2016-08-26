@@ -82,7 +82,6 @@ public class ProccessingData {
         } else {
             this.links = links;
         }
-        System.out.println("len="+this.links.size());
     }
     
     /**
@@ -107,7 +106,6 @@ public class ProccessingData {
                 boolean check = false;
 
                 for (Element e : tags) {
-                    String t = e.text();
                     if (blackList.contains(e.text())) {
                         check = true;
                         break;
@@ -148,7 +146,7 @@ public class ProccessingData {
         shutdown();
         
 //        if (this.tagEnable) {
-            tagCount();
+//            tagCount();
 //        }
         generateIndexPages();
         if (articleTag.size() > 1) {
@@ -160,17 +158,17 @@ public class ProccessingData {
     /**
      * Creating tag file with tags count
      */
-    private void tagCount() {
-        try {
-            File out = new File(outputFolder + File.separator + "tag.txt");
-            for (Map.Entry pair : tagCount.entrySet()) {
-                FileUtils.writeStringToFile(out , pair.getKey() + " = " + pair.getValue() +"\n" , true);
-            }
-        } catch (IOException e) {
-            logger.error("method: tagCount()\n"
-                    + "Unable to create tag.txt file: " + e);
-        }
-    }
+//    private void tagCount() {
+//        try {
+//            File out = new File(outputFolder + File.separator + "tag.txt");
+//            for (Map.Entry pair : tagCount.entrySet()) {
+//                FileUtils.writeStringToFile(out , pair.getKey() + " = " + pair.getValue() +"\n" , true);
+//            }
+//        } catch (IOException e) {
+//            logger.error("method: tagCount()\n"
+//                    + "Unable to create tag.txt file: " + e);
+//        }
+//    }
     
     /**
      * Proccessing web page
@@ -660,14 +658,6 @@ public class ProccessingData {
                 "</div>\n" +
                 "</div>\n" +
                 "</div><!-- #page -->\n" +
-                "\n" +
-                "<style type=\"text/css\">\n" +
-                "\n" +
-                "  .pushy,.menu-btn{ background: ; }\n" +
-                "  a,a:visited{ color:;}\n" +
-                "  a:hover,a:focus,a:active { color:; }\n" +
-                "\n" +
-                "</style>\n" +
                 "\n" +
                 "</body>\n" +
                 "</html>";
